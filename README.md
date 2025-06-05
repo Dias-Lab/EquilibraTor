@@ -12,12 +12,11 @@ EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the
 
 ## ⚙️ Usage
 
-
-
+To show EquilibratTor arguments:
 
 ```text
 usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP]
-                       [-ls LAST_STEP] [-as]
+                       [-ls LAST_STEP] [-as all_steps]
 
 EquilibraTor streamlines molecular dynamics and equilibration simulations for proteins and protein–ligand complexes through a unified, single-step execution.
 
@@ -33,7 +32,10 @@ optional arguments:
                         Step number to end at (1-based)
   -as, --all_steps      List of Equilibrator steps and exit
 ```
-If you want to run EquilibraTor only for a protein, for the first time:
+
+Note that only the protein file is required as input.
+
+To show the EquilibraTor steps to be performed for a protein file:
 
 ```Text
 python EquilibraTor.py -p example_protein.pdb -as
@@ -55,23 +57,41 @@ Available steps:
 14: Get equilibration MD output
 ```
 
-If you want to twick some parameters for your current protein file, and wants to avoid running the whole Equilibrator workflow, provided the steps that you want to run:
+To run EquilibraTor for a protein file:
+
+```Text
+python EquilibraTor.py -p example_protein.pdb
+
+If you want to tweak certain parameters for your current protein file and avoid running the entire Equilibrator workflow, you can specify only the steps you wish to execute:
 
 ```Text
 python EquilibraTor.py -p example_protein.pdb -fs 10 -ls 14
 
+To show the EquilibraTor steps to be performed when provided both protein and ligand files:
+
+```Text
+python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb -as
+
 Available steps:
 1: Generate topology for protein
-2: Prepare to merge topology file(s) if ligand provided
-3: Create the simulation box
-4: Solvate the system
-5: Add ions to neutralize the system
-6: Run energy minimization
-7: Plot potential energy
-8: Obtain potential, backbone, and pressure xvgs
-9: Plot panel of additional energy minimization results
-10: Get final minimized pdb structure
-11: Make refinement (Equilibrium)
-12: Get refinement output
-13: Run equilibration MD
-14: Get equilibration MD output
+2: Convert ligand PDB to MOL2
+3: Generate topology for ligand
+4: Prepare to merge topology file(s) if ligand provided
+5: Make a copy of protein if ligand provided
+6: Merge topologies
+7: Create the simulation box
+8: Solvate the system
+9: Add ions to neutralize the system
+10: Run energy minimization
+11: Plot potential energy
+12: Obtain potential, backbone, and pressure xvgs
+13: Plot panel of additional energy minimization results
+14: Get final minimized pdb structure
+15: Make refinement (Equilibrium)
+16: Get refinement output
+17: Run equilibration MD
+18: get equilibration MD output
+
+To run EquilibraTor using this protein-ligand files:
+
+python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
