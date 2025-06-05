@@ -55,7 +55,6 @@ Available steps:
 12: Get refinement output
 13: Run equilibration MD
 14: Get equilibration MD output
-```
 
 To run EquilibraTor for a protein file:
 
