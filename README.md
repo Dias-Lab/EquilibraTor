@@ -55,16 +55,18 @@ Available steps:
 12: Get refinement output
 13: Run equilibration MD
 14: Get equilibration MD output
-
+```
 To run EquilibraTor for a protein file:
 
 ```Text
 python EquilibraTor.py -p example_protein.pdb
+````
 
 If you want to tweak certain parameters for your current protein file and avoid running the entire Equilibrator workflow, you can specify only the steps you wish to execute:
 
 ```Text
 python EquilibraTor.py -p example_protein.pdb -fs 10 -ls 14
+```
 
 To show the EquilibraTor steps to be performed when provided both protein and ligand files:
 
@@ -90,7 +92,10 @@ Available steps:
 16: Get refinement output
 17: Run equilibration MD
 18: get equilibration MD output
+```
 
 To run EquilibraTor using this protein-ligand files:
 
+```Text
 python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
+```
