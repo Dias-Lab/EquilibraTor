@@ -12,8 +12,8 @@ EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the
 
 ## ⚙️ Usage
 
-```bash
-python EquilibraTor.py -p example_protein.pdb --all_steps
+```text
+python EquilibraTor.py -p example_protein.pdb -as
 
 Available steps:
 1: Generate topology for protein
@@ -29,5 +29,4 @@ Available steps:
 11: Make refinement (Equilibrium)
 12: Get refinement output
 13: Run equilibration MD
-14: get equilibration MD output
-```
+14: Get equilibration MD output
