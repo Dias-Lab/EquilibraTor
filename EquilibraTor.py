@@ -56,46 +56,41 @@ def generate_topology_protein(protein_file,topology_file,protein_gro):
     print(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
     run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
 
-def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_name,output_dir, ligand_provided):
+
+def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_name, output_dir, ligand_provided):
     """
-    Edita os arquivos de topologia para preparar a fusão.
+    Edits topology files to prepare for merging if ligand file provided.
 
     Parameters:
-        topology_file (str): Caminho para o arquivo `topol.top`.
-        ligand_itp (str): Caminho para o arquivo `baricitinib_GMX.itp`.
-        ligand_top (str): Caminho para o arquivo `baricitinib_GMX.top`.
-        molecule_name (str): Nome da molécula (e.g., 'baricitinib').
+        topology_file (str): Path to the `topol.top` file.
+        ligand_itp (str): Path to the `.itp` file.
+        ligand_top (str): Path to the `.top` file.
+        molecule_name (str): Name of the molecule (e.g., 'baricitinib').
     """
     print("\n" + "="*100)
-    print("[INFO]  Preparing to merge topologies.")
+    print("[INFO]  Preparing to merge topologies if ligand provided.")
     print("="*100)
 
-    # Adicionar as linhas de inclusão ao `topol.top`
     with open(topology_file, "r") as top_file:
         topology_lines = top_file.readlines()
     
     #; Include chain topologies
-    if ligand_provided: ## new
+    if ligand_provided:
         include_lines = [
             f'; Include ligand topology\n',
-            #f'#include "{os.path.join(output_dir, "topol_Protein_chain_A.itp")}"\n'
-            #f'#include "{os.path.join(output_dir, "topol_Protein_chain_B.itp")}"\n',
             f'#include "{os.path.join(output_dir, ligand_itp)}"\n',
             f'#include "{os.path.join(output_dir, ligand_top)}"\n',   
         ]
-
-        # Encontrar onde inserir as linhas de inclusão
         chain_includes_idx = next(
             (i for i, line in enumerate(topology_lines) 
              if line.strip() == '#include "amber99sb.ff/forcefield.itp"'),
             -1
         )
-
         if chain_includes_idx == -1:
-            raise ValueError("Linhas de cadeia de proteínas não encontradas em topol.top.")
+            raise ValueError("Protein chain include lines not found in topol.top.")
         
         if not any(ligand_itp in line for line in topology_lines):
-            # Inserir as linhas de inclusão logo após as cadeias
+            # Insert the inclusion lines right after the strings
             topology_lines = (
                 topology_lines[:chain_includes_idx + 1] +
                 include_lines +
@@ -103,7 +98,7 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
                 topology_lines[chain_includes_idx + 1:]
             )
 
-        # Adicionar a informação da molécula na seção [ molecules ]
+        # Add the molecule information in the [ molecules ] section
         molecules_entry = f"{molecule_name}         1\n"
         molecule_section_idx = next(
             (i for i, line in enumerate(topology_lines) if line.strip().startswith("[ molecules ]")),-1)
@@ -111,7 +106,7 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
         if molecule_section_idx != -1 and molecules_entry not in topology_lines[molecule_section_idx:]:
             topology_lines.append(molecules_entry)
 
-    # Remover linhas específicas da lista
+    # Remove specific lines from the list
     topology_lines = [
         line.replace('#include "topol_Protein_chain_A.itp"', '').replace('#include "topol_Protein_chain_B.itp"', '')
         for line in topology_lines
@@ -120,10 +115,10 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
     with open(topology_file, "w") as top_file:
         top_file.writelines(topology_lines)
 
-    print(f"Arquivo {topology_file} atualizado com sucesso.")
+    print(f"{topology_file} successfully updated")
 
     if ligand_provided:
-        # Modificar `baricitinib_GMX.top`
+        # Modify ligand top file
         with open(ligand_top, "r") as ligand_top_file:
             ligand_top_lines = ligand_top_file.readlines()
 
@@ -133,35 +128,29 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
             for line in ligand_top_lines:
                 stripped_line = line.strip()
 
-                # Ignorar linhas relacionadas a POSRES_LIG
+                # Ignore lines related to POSRES_LIG
                 if stripped_line.startswith("#ifdef POSRES_LIG") or stripped_line.startswith("#endif") or 'posre_' in stripped_line:
-                    modified_ligand_top.append(line)  # Não modificar essas linhas
-
-                    # Detectar seção "[ defaults ]" e comentar
+                    modified_ligand_top.append(line)  
+                    
+                # Detect “[ defaults ]” section and comment out
                 elif stripped_line.startswith("[ defaults ]"):
                     in_defaults = True
-                    modified_ligand_top.append(f"; {line}")  # Comentar a linha
-                    # Detectar seção "[ system ]" e comentar
+                    modified_ligand_top.append(f"; {line}")
                 elif stripped_line.startswith("[ system ]"):
                     in_defaults = True
-                    modified_ligand_top.append(f"; {line}")  # Comentar a linha        
-                    # Detectar fim da seção de defaults
+                    modified_ligand_top.append(f"; {line}")    
                 elif in_defaults and stripped_line == "":
                     in_defaults = False
-
-                    # Comentar outras linhas relevantes
                 elif in_defaults or stripped_line.startswith("#include") or stripped_line.startswith("[ molecules ]"):
-                    modified_ligand_top.append(f"; {line}")  # Comentar a linha
-                    
-                    # Manter as demais linhas inalteradas
+                    modified_ligand_top.append(f"; {line}") 
                 else:
                     modified_ligand_top.append(f"; {line}")
 
-        # Escrever o arquivo modificado
+        # write modified file
         with open(ligand_top, "w") as ligand_top_file:
             ligand_top_file.writelines(modified_ligand_top)
         
-        print(f"Arquivo {ligand_top} atualizado com sucesso.")
+        print(f"{ligand_top} modified succesfully")
 
 def merge_topologies(protein_gro, ligand_gro, output_gro, ligand_file):
     """Merge protein and ligand topologies."""
@@ -201,28 +190,28 @@ def solvate_system(input_gro, output_gro, topology_file):
 
 def modify_topology(atomtypes_file, topology_file):
     """
-    Modifica os arquivos de topologia para garantir que os atomtypes sejam definidos corretamente.
+    Modifies the topology files to ensure that atom types are correctly defined.
 
     Parameters:
-        atomtypes_file (str): Caminho para o arquivo contendo a seção [atomtypes] (e.g., baricitinib_GMX.itp).
-        topology_file (str): Caminho para o arquivo de topologia principal (e.g., topol.top).
+        atomtypes_file (str): Path to the file containing the [atomtypes] section (e.g., baricitinib_GMX.itp).
+        topology_file (str): Path to the main topology file (e.g., topol.top).
     """
-    # Lê o arquivo de atomtypes
+    # Read the atomtypes file
     with open(atomtypes_file, "r") as at_file:
         lines = at_file.readlines()
 
-    # Extrair a seção [atomtypes]
+    # Extract the [atomtypes] section
     atomtypes_section = []
     in_atomtypes = False
     for line in lines:
         if line.strip().startswith("[ atomtypes ]"):
             in_atomtypes = True
         elif line.strip().startswith("[") and in_atomtypes:
-            break  # Sai da seção ao encontrar outra definição de bloco
+            break  # Exit the section when another block definition is found
         if in_atomtypes:
             atomtypes_section.append(line)
 
-    # Remover ou comentar a seção [atomtypes] do arquivo original, preservando linhas em branco
+    # Comment out the [atomtypes] section in the original file, preserving blank lines
     modified_lines = [
         f"; {line}" if line.strip() and line in atomtypes_section else line
         for line in lines
@@ -230,7 +219,7 @@ def modify_topology(atomtypes_file, topology_file):
     with open(atomtypes_file, "w") as at_file:
         at_file.writelines(modified_lines)
 
-    # Adicionar a seção [atomtypes] ao início de topol.top, após o include do forcefield
+    # Insert the [atomtypes] section into the beginning of topol.top, after the forcefield include
     with open(topology_file, "r") as top_file:
         topology_lines = top_file.readlines()
 
@@ -238,9 +227,9 @@ def modify_topology(atomtypes_file, topology_file):
         (i for i, line in enumerate(topology_lines) if "forcefield.itp" in line), -1
     )
     if forcefield_idx == -1:
-        raise ValueError("Não foi possível encontrar o include de forcefield.itp em topol.top")
+        raise ValueError("Could not find the forcefield.itp include in topol.top")
 
-    # Atualiza o arquivo de topologia
+    # Update the topology file
     updated_topology = (
         topology_lines[:forcefield_idx + 1]
         + ["\n"] + atomtypes_section + ["\n"]
@@ -249,8 +238,7 @@ def modify_topology(atomtypes_file, topology_file):
     with open(topology_file, "w") as top_file:
         top_file.writelines(updated_topology)
 
-    print(f"Topologia modificada com sucesso: {topology_file}")
-
+    print(f"Topology successfully modified: {topology_file}")
 
 def add_ions_with_modifications(mdp_file, input_gro, output_gro, topology_file, atomtypes_file):
     """
@@ -263,12 +251,12 @@ def add_ions_with_modifications(mdp_file, input_gro, output_gro, topology_file, 
         topology_file (str): Caminho para o arquivo de topologia principal.
         atomtypes_file (str): Caminho para o arquivo contendo a seção [atomtypes].
     """
-    # Modificar os arquivos de topologia
+    # Modify topology files
     modify_topology(atomtypes_file, topology_file)
 
-    # Executar a adição de íons (substitua pelo comando GROMACS real)
+    # Perform ion addition
     add_ions(mdp_file, input_gro, output_gro, topology_file)
-    print(f"Íons adicionados com sucesso: {output_gro}")
+    print(f"Ions added successfully: {output_gro}")
 
 def add_ions(mdp_file, input_gro, output_gro, topology_file):
     """Add ions to the system."""
@@ -515,8 +503,6 @@ def Run_NPT_Equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb):
 # Workflow execution
 def main():
 
-    # Define file paths
-    # Configuração do argparse
     parser = argparse.ArgumentParser(
         description="Process files for ligand, protein, and mutants_uniprot."
     )
@@ -553,10 +539,10 @@ def main():
     )
     
     
-    # Parse os argumentos
+    # Parse arguments
     args = parser.parse_args()
 
-    # Atribuição de arquivos
+    # defining variable for input files 
     ligand_file = args.ligand
     protein_file = args.protein
 
@@ -564,7 +550,7 @@ def main():
     molecule_name = ligand_file.replace('.pdb','') if ligand_file else ''
     Project_dir += f"_{molecule_name}" if ligand_file else ''
             
-    # Criação do diretório para armazenar os dados
+    # Creating the directory to store outputs
     output_dir = os.path.join(os.getcwd(), Project_dir)
     os.makedirs(output_dir, exist_ok=True)   
     os.system("cp *.mdp "+output_dir+"/")
@@ -645,7 +631,7 @@ def main():
         equilibrator_steps.append(("Generate topology for ligand", lambda: generate_topology_ligand(ligand_mol2, molecule_name)))
 
     # === Merge Prep ===
-    equilibrator_steps.append(("Prepare to topology file(s)", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_name, output_dir, ligand_file)))
+    equilibrator_steps.append(("Prepare to merge topology file(s) if ligand provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_name, output_dir, ligand_file)))
 
     if ligand_file:
         equilibrator_steps.append(("Make a copy of protein if ligand provided", lambda: make_copy_of_protein(protein_gro, protein_gro_complex, ligand_file)))
@@ -684,5 +670,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-
-    
