@@ -33,7 +33,8 @@ optional arguments:
   -as, --all_steps      List of Equilibrator steps and exit
 ```
 
-Note that only the protein file is required as input.
+Note that only the protein file is required as input. 
+Additional note: When the ligand is a polypeptide or another protein, it must be combined with the main protein into a single PDB file and provided using the -p option. In this case, do not use the -l option, as both components are treated as a unified protein complex
 
 To show the EquilibraTor steps to be performed for a protein file:
 
