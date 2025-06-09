@@ -386,7 +386,7 @@ def plot_eq(eq_potential,eq_pressure_xvg,eq_temperature_xvg,eq_rmsd_xvg,eq_rmsf_
     # Plot RMSF
     axs[2, 0].plot(rmsf[:, 0], rmsf[:, 1], label='RMSF', color='m')
     axs[2, 0].set_ylabel('RMSF (nm)')
-    axs[2, 0].set_xlabel('Residue')
+    axs[2, 0].set_xlabel('Atom')
     axs[2, 0].legend()
 
     # Plot Radius of Gyration
