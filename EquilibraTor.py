@@ -107,7 +107,7 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
             )
 
         # Add the molecule information in the [ molecules ] section
-        molecules_entry = f"{ligand_name}         1\n"
+        molecules_entry = f"{molecule_name}         1\n"
         molecule_section_idx = next(
             (i for i, line in enumerate(topology_lines) if line.strip().startswith("[ molecules ]")),-1)
 
