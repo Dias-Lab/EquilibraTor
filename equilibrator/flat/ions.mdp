@@ -1,0 +1,5 @@
+; minimal mdp file for adding ions
+integrator  = steep
+nsteps      = 0
+emtol       = 100.0
+emstep      = 0.01
