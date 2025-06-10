@@ -1,6 +1,6 @@
 # 🧬 EquilibraTor
 
-**EquilibraTor** is a Python-based command-line tool that automates the setup and execution of molecular dynamics (MD) simulations for protein (and optionally ligand) systems using GROMACS. The pipeline runs from topology generation to energy minimization and equilibration, with customizable execution steps.
+EquilibraTor is a Python-based command-line tool that automates the setup and execution of molecular dynamics (MD) simulations for protein (and optionally ligand) systems using GROMACS. The pipeline runs from topology generation to energy minimization and equilibration, with customizable execution steps.
 
 ---
 
@@ -33,8 +33,12 @@ optional arguments:
   -as, --all_steps      List of Equilibrator steps and exit
 ```
 
-Note that only the protein file is required as input. 
-Additional note: When the ligand is a polypeptide or another protein, it must be combined with the main protein into a single PDB file and provided using the -p option. In this case, do not use the -l option, as both components are treated as a unified protein complex
+## 📌 Note
+
+- Only the protein file is required as input. 
+- When the ligand is a polypeptide or another protein, it must be combined with the main protein into a single PDB file and provided using the -p option.
+- Default .mdp files (ions.mdp, minim.mdp, equilibration.mdp, equilibration_2.mdp) are in equilibrator/flat. Modify them directly to change parameters.
+
 
 To show the EquilibraTor steps to be performed for a protein file:
 
