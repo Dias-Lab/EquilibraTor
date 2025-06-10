@@ -558,8 +558,8 @@ def main():
             
     # Creating the directory to store outputs
     output_dir = os.path.join(os.getcwd(), Project_dir)
-    os.makedirs(output_dir, exist_ok=True)   
-    ligand_mol2 = os.path.join(output_dir, ligand_file.replace('.pdb','.mol2')) if ligand_file else ''
+    os.makedirs(output_dir, exist_ok=True)
+    ligand_mol2 = os.path.join(output_dir, ligand_name + '.mol2') if ligand_file else ''
     protein_gro = os.path.join(output_dir, f"{protein_name}_processed.gro")
     protein_gro_complex = protein_gro.replace('.gro','_complex.gro')
     merged_gro = os.path.join(output_dir, "merged.gro")
