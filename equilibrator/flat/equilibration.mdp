@@ -1,0 +1,51 @@
+; Run parameters
+integrator               = md
+nsteps                   = 5000000     ; 10000 ps with a 2 fs timestep
+dt                       = 0.002     ; 2 fs
+
+; Output control
+nstxout                  = 1000      ; Save coordinates every 2 ps
+nstvout                  = 1000      ; Save velocities every 2 ps
+nstenergy                = 1000      ; Save energies every 2 ps
+nstlog                   = 1000      ; Update log file every 2 ps
+
+; Bond parameters
+continuation             = no        ; First dynamics run
+constraint_algorithm     = lincs     ; Constraint algorithm
+constraints              = h-bonds   ; H-bonds constrained
+lincs_iter               = 1         ; Accuracy of LINCS
+lincs_order              = 4         ; Also related to accuracy
+
+; Neighborsearching
+cutoff-scheme            = Verlet    ; Buffered neighbor searching scheme
+ns_type                  = grid      ; Search neighboring grid cells
+nstlist                  = 10        ; Frequency to update neighbor list and long range forces
+rcoulomb                 = 1.0       ; Short-range electrostatic cutoff (in nm)
+rvdw                     = 1.0       ; Short-range Van der Waals cutoff (in nm)
+
+; Electrostatics
+coulombtype              = PME       ; Particle Mesh Ewald for long-range electrostatics
+pme_order                = 4         ; Cubic interpolation
+fourierspacing           = 0.16      ; Grid spacing for FFT
+
+; Temperature coupling is on
+tcoupl                   = V-rescale ; Modified Berendsen thermostat
+tc-grps                  = Protein Non-Protein   ; Two coupling groups - more accurate
+tau_t                    = 0.1 0.1   ; Time constant for coupling (ps)
+ref_t                    = 300 300   ; Reference temperature (K)
+
+; Pressure coupling is off for NVT equilibration, on for NPT equilibration
+pcoupl                   = no        ; No pressure coupling in NVT
+
+; Generate velocities to start
+gen_vel                  = yes       ; Assign velocities from Maxwell distribution
+gen_temp                 = 300       ; Temperature for Maxwell distribution (K)
+gen_seed                 = -1        ; Random seed for generating velocities
+
+; Periodic boundary conditions
+pbc                      = xyz       ; 3-D PBC
+
+; Dispersion correction
+DispCorr                 = EnerPres  ; Apply long range dispersion corrections for Energy and Pressure
+
+; Velocity generation is off when continuing from a previous run (NPT equilibration)

@@ -1,0 +1,51 @@
+; Run parameters
+integrator               = md
+nsteps                   = 5000000     ; 10000 ps with a 2 fs timestep
+dt                       = 0.002       ; 2 fs
+
+; Output control
+nstxout                  = 1000        ; Save coordinates every 2 ps
+nstvout                  = 1000        ; Save velocities every 2 ps
+nstenergy                = 1000        ; Save energies every 2 ps
+nstlog                   = 1000        ; Update log file every 2 ps
+
+; Bond parameters
+continuation             = yes         ; Continuing from NVT
+constraint_algorithm     = lincs
+constraints              = h-bonds
+lincs_iter               = 1
+lincs_order              = 4
+
+; Neighborsearching
+cutoff-scheme            = Verlet
+ns_type                  = grid
+nstlist                  = 10
+rcoulomb                 = 1.0
+rvdw                     = 1.0
+
+; Electrostatics
+coulombtype              = PME
+pme_order                = 4
+fourierspacing           = 0.16
+
+; Temperature coupling is on
+tcoupl                   = V-rescale
+tc-grps                  = Protein Non-Protein
+tau_t                    = 0.1 0.1
+ref_t                    = 300 300     ; Target temperature for both groups
+
+; Pressure coupling is on for NPT
+pcoupl                   = Parrinello-Rahman
+pcoupltype               = isotropic
+tau_p                    = 2.0
+ref_p                    = 1.0
+compressibility          = 4.5e-5
+
+; Periodic boundary conditions
+pbc                      = xyz
+
+; Dispersion correction
+DispCorr                 = EnerPres
+
+; Velocity generation
+gen_vel                  = no          ; Do not generate velocities
