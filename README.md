@@ -9,6 +9,12 @@ EquilibraTor is a Python-based command-line tool that automates the setup and ex
 <img src="figures/equilibrator_workflow.svg">
 EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the process into modular, automated steps. Users can run the entire pipeline or start/stop at specific steps — ideal for debugging, re-running specific stages, or customizing workflows.
 
+-Protein PDB Preprocessing — Black
+-Ligand PDB Preprocessing — Grey (Optional)
+-GROMACS Preprocessing — Blue
+-Energy Minimization & Equilibration — Orange
+-EquilibraTor Outputs — Green
+
 ---
 
 ## ⚙️ Usage
