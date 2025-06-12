@@ -16,12 +16,20 @@ EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the
 To show EquilibratTor arguments:
 
 ```text
-usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP]
-                       [-ls LAST_STEP] [-as all_steps]
+usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
-EquilibraTor streamlines molecular dynamics and equilibration simulations for proteins and protein–ligand complexes through a unified, single-step execution.
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v0.0.1
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -l LIGAND, --ligand LIGAND
                         Path to the ligand file.
