@@ -15,6 +15,20 @@ MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp'
 EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
 EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
 
+VERSION = 'v0.0.1'
+
+DESCRIPTION = """
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:"""+VERSION
+
 def run_equilibrator_steps(pipeline_steps, args):
     first_idx = args.first_step - 1
     last_idx = args.last_step
@@ -509,9 +523,8 @@ def Run_NPT_Equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb):
 
 # Workflow execution
 def main():
-
     parser = argparse.ArgumentParser(
-        description="Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution"
+        description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "-l", "--ligand", 
