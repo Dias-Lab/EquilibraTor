@@ -12,13 +12,13 @@ EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the
 
 - **Protein PDB Preprocessing** — ⬛ <span style="color:black;"><strong>Black</strong></span>
 
-- **Ligand PDB Preprocessing** *(Optional)* — ⬜ **Grey**
+- **Ligand PDB Preprocessing** *(Optional)* — ⬜ <span style="color:grey;"><strong>Grey</strong></span>
 
-- **GROMACS Preprocessing** — 🟦 **Blue**
+- **GROMACS Preprocessing** — 🟦 <span style="color:#1f77b4;"><strong>Blue</strong></span>
 
-- **Energy Minimization & Equilibration** — 🟧 **Orange**
+- **Energy Minimization & Equilibration** — 🟧 <span style="color:orange;"><strong>Orange</strong></span>
 
-- **EquilibraTor Outputs** — 🟩 **Green**
+- **EquilibraTor Outputs** — 🟩 <span style="color:green;"><strong>Green</strong></span>
 ---
 
 ## ⚙️ Usage
