@@ -6,6 +6,8 @@ EquilibraTor is a Python-based command-line tool that automates the setup and ex
 
 ## 🚀 Overview
 
+<img src="figures/equilibrator_workflow.pdf">
+
 EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the process into modular, automated steps. Users can run the entire pipeline or start/stop at specific steps — ideal for debugging, re-running specific stages, or customizing workflows.
 
 ---
