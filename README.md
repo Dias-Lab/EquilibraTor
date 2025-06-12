@@ -122,3 +122,9 @@ To run EquilibraTor using this protein-ligand files:
 ```Text
 python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
 ```
+
+
+## 💾 Outputs
+
+### Multiple panel figure
+<img src="figures/protein-ligand_equilibration.png">
