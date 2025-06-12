@@ -128,3 +128,7 @@ python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
 
 ### Multiple panel figure
 <img src="figures/protein-ligand_equilibration.png">
+
+### Equilibration PDB last frame
+<img src="figures/protein-ligand_eq_last_frame.png">
+
