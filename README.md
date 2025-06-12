@@ -25,6 +25,9 @@ EquilibraTor is a Python-based command-line tool that automates the setup and ex
 To show EquilibratTor arguments:
 
 ```text
+python EquilibraTor.py -h
+```
+```
 usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
    ____          _ ___ __           ______        
