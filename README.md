@@ -15,13 +15,13 @@ Ensure you have the following installed:
 - Matplotlib
 
 ---
-### option1:
+### Option 1:
 
 ```bash
 pip install EquilibraTor
 ```
 
-### option2: 📥 Clone the Repository
+### Option 2:
 
 Clone this repository to your local machine:
 
@@ -50,11 +50,14 @@ cd EquilibraTor
 
 ## ⚙️ Usage
 
+If installed via `pip`, use only `equilibrator ...` otherwise `python EquilibraTor.py ...`
+
 To show EquilibratTor arguments:
 
 ```text
 python EquilibraTor.py -h
 ```
+
 ```
 usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
