@@ -2,6 +2,34 @@
 
 EquilibraTor is a Python-based command-line tool that automates the setup and execution of molecular dynamics (MD) simulations for protein (and optionally ligand) systems using GROMACS. The pipeline runs from topology generation to energy minimization and equilibration, with customizable execution steps.
 
+## 🛠️  Installation
+
+### ✅ Prerequisites
+
+Ensure you have the following installed:
+
+- Python 3.8+
+- pip (Python package installer)
+- Git
+- Numpy
+- Matplotlib
+
+---
+### option1:
+
+```bash
+pip install EquilibraTor
+```
+
+### option2: 📥 Clone the Repository
+
+Clone this repository to your local machine:
+
+```bash
+git clone https://github.com/Dias-Lab/EquilibraTor.git
+cd EquilibraTor
+```
+
 ---
 
 ## 🚀 Overview
