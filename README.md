@@ -13,6 +13,8 @@ Ensure you have the following installed:
 - Git
 - Numpy
 - Matplotlib
+- GROMACS
+- Open Babel
 
 ---
 ### Option 1:
@@ -52,7 +54,7 @@ cd EquilibraTor
 
 If installed via `pip`, use only `equilibrator ...` otherwise `python EquilibraTor.py ...`
 
-To show EquilibratTor arguments:
+To show EquilibraTor arguments:
 
 ```text
 python EquilibraTor.py -h
@@ -165,4 +167,3 @@ python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
 
 ### Equilibration PDB last frame
 <img src="figures/protein-ligand_eq_last_frame.png">
-
