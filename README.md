@@ -2,25 +2,79 @@
 
 EquilibraTor is a Python-based command-line tool that automates the setup and execution of molecular dynamics (MD) simulations for protein (and optionally ligand) systems using GROMACS. The pipeline runs from topology generation to energy minimization and equilibration, with customizable execution steps.
 
+## 🛠️  Installation
+
+### ✅ Prerequisites
+
+Ensure you have the following installed:
+
+- Python 3.8+
+- pip (Python package installer)
+- Git
+- Numpy
+- Matplotlib
+- GROMACS
+- Open Babel
+
+---
+### Option 1:
+
+```bash
+pip install EquilibraTor
+```
+
+### Option 2:
+
+Clone this repository to your local machine:
+
+```bash
+git clone https://github.com/Dias-Lab/EquilibraTor.git
+cd EquilibraTor
+```
+
 ---
 
 ## 🚀 Overview
 
-EquilibraTor streamlines MD preparation and execution in GROMACS by breaking the process into modular, automated steps. Users can run the entire pipeline or start/stop at specific steps — ideal for debugging, re-running specific stages, or customizing workflows.
+<img src="figures/equilibrator_workflow.svg">
+
+- **Protein PDB Preprocessing** — ⬛ 
+
+- **Ligand PDB Preprocessing** *(Optional)* — ⬜ 
+
+- **GROMACS Preprocessing** — 🟦 
+
+- **Energy Minimization & Equilibration** — 🟧 
+
+- **EquilibraTor Outputs** — 🟩 
 
 ---
 
 ## ⚙️ Usage
 
-To show EquilibratTor arguments:
+If installed via `pip`, use only `equilibrator ...` otherwise `python EquilibraTor.py ...`
+
+To show EquilibraTor arguments:
 
 ```text
-usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP]
-                       [-ls LAST_STEP] [-as all_steps]
+python EquilibraTor.py -h
+```
 
-EquilibraTor streamlines molecular dynamics and equilibration simulations for proteins and protein–ligand complexes through a unified, single-step execution.
+```
+usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
-optional arguments:
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v0.0.1
+
+options:
   -h, --help            show this help message and exit
   -l LIGAND, --ligand LIGAND
                         Path to the ligand file.
@@ -104,3 +158,12 @@ To run EquilibraTor using this protein-ligand files:
 ```Text
 python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
 ```
+
+
+## 💾 Outputs
+
+### Multiple panel figure
+<img src="figures/protein-ligand_equilibration.png">
+
+### Equilibration PDB last frame
+<img src="figures/protein-ligand_eq_last_frame.png">
