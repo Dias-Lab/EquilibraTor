@@ -72,7 +72,7 @@ Equilibrator streamlines Molecular dynamics and equilibration simulations for pr
 Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
-Version:v0.0.1
+Version:v0.1.1
 
 options:
   -h, --help            show this help message and exit
