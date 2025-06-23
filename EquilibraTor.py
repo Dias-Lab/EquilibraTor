@@ -15,7 +15,7 @@ MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp'
 EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
 EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
 
-VERSION = 'v0.1.0'
+VERSION = 'v0.1.1'
 
 DESCRIPTION = """
    ____          _ ___ __           ______        
