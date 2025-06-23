@@ -15,7 +15,7 @@ Ensure you have the following installed:
 - Matplotlib
 - GROMACS
 - Open Babel
-
+- ACPYPE
 ---
 ### Option 1:
 
@@ -110,10 +110,10 @@ Available steps:
 8: Obtain potential, backbone, and pressure xvgs
 9: Plot panel of additional energy minimization results
 10: Get final minimized pdb structure
-11: Make refinement (Equilibrium)
-12: Get refinement output
-13: Run equilibration MD
-14: Get equilibration MD output
+11: Run NVT equilibration
+12: Get NVT equilibration output
+13: Run NPT equilibration
+14: Get NPT equilibration output
 ```
 To run EquilibraTor for a protein file:
 
@@ -147,10 +147,10 @@ Available steps:
 12: Obtain potential, backbone, and pressure xvgs
 13: Plot panel of additional energy minimization results
 14: Get final minimized pdb structure
-15: Make refinement (Equilibrium)
-16: Get refinement output
-17: Run equilibration MD
-18: get equilibration MD output
+15: Run NVT equilibration
+16: Get NVT equilibration output
+17: Run NPT equilibration output
+18: Get NPT equilibration output
 ```
 
 To run EquilibraTor using this protein-ligand files:
