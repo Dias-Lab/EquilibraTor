@@ -149,7 +149,7 @@ Available steps:
 14: Get final minimized pdb structure
 15: Run NVT equilibration
 16: Get NVT equilibration output
-17: Run NPT equilibration output
+17: Run NPT equilibration
 18: Get NPT equilibration output
 ```
 
