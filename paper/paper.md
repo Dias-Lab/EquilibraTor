@@ -39,9 +39,8 @@ Traditional workflows require multiple manual steps: preprocessing of Protein Da
 
 EquilibraTor streamlines the complex and fragmented setup process of MD simulations by providing an automated, end-to-end pipeline for preparing and equilibrating proteins, protein-protein, and protein–ligand complexes. By unifying these steps into a single reproducible workflow, it reduces setup overhead and lets researchers focus on their scientific questions rather than technical preprocessing. The implementation prioritizes clarity and reproducibility, requiring minimal user intervention beyond supplying the initial input files (\autoref{fig:workflow}).
 
-![EquilibraTor workflow.\label{fig:workflow}](figures/equilibrator_workflow.svg)
-
-**Figure 1. EquilibraTor workflow for MD and equilibration simulations.** The pipeline begins with the specification and preprocessing of input files: a required protein PDB file (black boxes) and an optional ligand PDB file (grey boxes). In the GROMACS preprocessing stage (blue boxes), EquilibraTor builds the simulation box, solvates the system, and adds ions for charge neutralization. It then performs energy minimization and two-stage equilibration (orange boxes). Energy minimization and NVT/NPT equilibration steps use default .mdp parameter files included with EquilibraTor—IONS_MDP, MINIM_MDP, EQUILIBRATION_MDP, and EQUILIBRATION_2_MDP—which users can customize as needed. As outputs (green boxes), EquilibraTor generates a publication-ready multi-panel figure showing key simulation metrics (potential energy, pressure, temperature, RMSD, RMSF, and radius of gyration) and exports both the final frame as a PDB file and a movie of the full simulation trajectory.
+![**Figure 1. EquilibraTor workflow for MD and equilibration simulations.** The pipeline begins with the specification and preprocessing of input fil$
+.\label{fig:workflow}](figures/equilibrator_workflow.svg)
 
 To address the common challenges in MD simulation preparation, EquilibraTor provides these features:
 
