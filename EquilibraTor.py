@@ -15,7 +15,7 @@ MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp'
 EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
 EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
 
-VERSION = 'v0.1.0'
+VERSION = 'v0.1.1'
 
 DESCRIPTION = """
    ____          _ ___ __           ______        
@@ -658,16 +658,16 @@ def main():
     equilibrator_steps.append(("Plot panel of additional energy minimization results", lambda: plot_em_results(potential_xvg, pressure_xvg, rmsf_xvg, energy_minimization_results)))
     equilibrator_steps.append(("Get final minimized pdb structure", lambda: get_final_minimized_structure(em_tpr, em_trr, final_minimized)))
 
-    # === Equilibration ===
-    equilibrator_steps.append(("Make refinement (Equilibrium)", lambda: make_refinement(topology_file, equilibration_tpr, em_gro
+    # === NVT Equilibration ===
+    equilibrator_steps.append(("Run NVT equilibration", lambda: make_refinement(topology_file, equilibration_tpr, em_gro
     )))
-    equilibrator_steps.append(("Get refinement output", lambda: get_refinement_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro
+    equilibrator_steps.append(("Get NVT equilibration output", lambda: get_refinement_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro
     )))
 
     #===NPT Equilibration ===
-    equilibrator_steps.append(("Run equilibration MD", lambda: Run_NPT_Equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb
+    equilibrator_steps.append(("Run NPT equilibration", lambda: Run_NPT_Equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb
     )))
-    equilibrator_steps.append(("get equilibration MD output", lambda: get_refinement_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf, final_npt_gro
+    equilibrator_steps.append(("Get NPT equilibration output", lambda: get_refinement_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf, final_npt_gro
     )))
 
     if args.last_step is None:
