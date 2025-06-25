@@ -36,7 +36,7 @@ cd EquilibraTor
 
 ## 🚀 Overview
 
-<img src="paper/figures/equilibrator_workflow.svg">
+<img src="paper/figures/equilibrator_workflow.png">
 
 - **Protein PDB Preprocessing** — ⬛ 
 
