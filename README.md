@@ -97,7 +97,7 @@ options:
 To show the EquilibraTor steps to be performed for a protein file:
 
 ```Text
-python EquilibraTor.py -p example_protein.pdb -as
+python EquilibraTor.py -p example/example_protein.pdb -as
 
 Available steps:
 1: Generate topology for protein
@@ -118,19 +118,19 @@ Available steps:
 To run EquilibraTor for a protein file:
 
 ```Text
-python EquilibraTor.py -p example_protein.pdb
+python EquilibraTor.py -p example/example_protein.pdb
 ````
 
 If you want to tweak certain parameters for your current protein file and avoid running the entire Equilibrator workflow, you can specify only the steps you wish to execute:
 
 ```Text
-python EquilibraTor.py -p example_protein.pdb -fs 10 -ls 14
+python EquilibraTor.py -p example/example_protein.pdb -fs 10 -ls 14
 ```
 
 To show the EquilibraTor steps to be performed when provided both protein and ligand files:
 
 ```Text
-python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb -as
+python EquilibraTor.py -l example/example_ligand.pdb -p example/example_protein.pdb -as
 
 Available steps:
 1: Generate topology for protein
@@ -156,7 +156,7 @@ Available steps:
 To run EquilibraTor using this protein-ligand files:
 
 ```Text
-python EquilibraTor.py -l example_ligand.pdb -p example_protein.pdb
+python EquilibraTor.py -l example/example_ligand.pdb -p example/example_protein.pdb
 ```
 
 
