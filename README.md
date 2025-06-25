@@ -36,7 +36,7 @@ cd EquilibraTor
 
 ## 🚀 Overview
 
-<img src="figures/equilibrator_workflow.svg">
+<img src="paper/figures/equilibrator_workflow.svg">
 
 - **Protein PDB Preprocessing** — ⬛ 
 
@@ -163,7 +163,7 @@ python EquilibraTor.py -l example/example_ligand.pdb -p example/example_protein.
 ## 💾 Outputs
 
 ### Multiple panel figure
-<img src="figures/protein-ligand_equilibration.png">
+<img src="paper/figures/protein-ligand_equilibration.png">
 
 ### Equilibration PDB last frame
-<img src="figures/protein-ligand_eq_last_frame.png">
+<img src="paper/figures/protein-ligand_eq_last_frame.png">
