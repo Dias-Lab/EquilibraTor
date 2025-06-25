@@ -12,7 +12,7 @@ authors:
     affiliation: "1"
   - name: Jose Cleydson F. Silva
     equal-contrib: true
-    orcid: 0000-0001--5435-702X
+    orcid: 0000-0001-5435-702X
     affiliation: "1"
   - name: Raquel Dias
     orcid: 0000-0002-8387-1234
