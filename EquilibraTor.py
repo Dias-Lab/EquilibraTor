@@ -353,7 +353,7 @@ def get_final_minimized_structure(em_tpr, em_trr, final_minimized):
     print("\n" + "="*100)
     print("[INFO]  Generating final minimized structure.")
     print("="*100)
-    run_command(f"echo non-Water | gmx trjconv -s {em_tpr} -f {em_trr} -o {final_minimized} -pbc nojump")
+    run_command(f"echo 'non-Water' | gmx trjconv -s {em_tpr} -f {em_trr} -o {final_minimized} -pbc nojump")
 
 def load_xvg(filename):
     """Load data from an XVG file, ignoring comments."""
