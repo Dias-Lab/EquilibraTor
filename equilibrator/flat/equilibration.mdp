@@ -1,6 +1,6 @@
 ; Run parameters
 integrator               = md
-nsteps                   = 5000000     ; 10000 ps with a 2 fs timestep
+nsteps                   = 500000     ; 10000 ps with a 2 fs timestep
 dt                       = 0.002     ; 2 fs
 
 ; Output control

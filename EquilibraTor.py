@@ -15,7 +15,7 @@ MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp'
 EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
 EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
 
-VERSION = 'v0.1.1'
+VERSION = 'v0.1.2'
 
 DESCRIPTION = """
    ____          _ ___ __           ______        
@@ -62,21 +62,21 @@ def pdb_2_mol2(ligand_file, ligand_mol2):
     print(f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}")
     run_command(f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}")
 
-def generate_topology_ligand(ligand_file,output_dir):
+def generate_topology_ligand(ligand_file,ligand_name, output_dir):
     """Generate ligand topology using ACPYPE."""
     print("\n" + "="*100)
     print("[INFO]  Generating topology for the ligand.")
     print("="*100)
-    print(f"acpype -i {ligand_file} -l -o gmx -b {output_dir}")
-    run_command(f"acpype -i {ligand_file} -l -o gmx -b {output_dir}")
+    print(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name}")
+    run_command(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name}", cwd=output_dir)
 
-def generate_topology_protein(protein_file,topology_file,protein_gro):
+def generate_topology_protein(protein_file,topology_file,protein_gro,output_dir):
     """Generate protein topology using GROMACS."""
     print("\n" + "="*100)
     print("[INFO]  Generating topology for the protein.")
     print("="*100)
     print(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
-    run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
+    run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}", cwd=output_dir)
 
 
 def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_name, output_dir, ligand_provided):
@@ -277,25 +277,25 @@ def add_ions_with_modifications(mdp_file, input_gro, output_gro, topology_file, 
     modify_topology(atomtypes_file, topology_file)
 
     # Perform ion addition
-    add_ions(mdp_file, input_gro, output_gro, topology_file)
+    add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr)
     print(f"Ions added successfully: {output_gro}")
 
-def add_ions(mdp_file, input_gro, output_gro, topology_file):
+def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir):
     """Add ions to the system."""
     print("\n" + "="*100)
     print("[INFO] Adding ions to the system.")
     print("="*100)
-    print (f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o ions.tpr")
-    run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o ions.tpr")
-    print (f"echo SOL | gmx genion -s ions.tpr -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
-    run_command(f"echo SOL | gmx genion -s ions.tpr -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
+    print (f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}")
+    run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}", cwd=output_dir)
+    print (f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
+    run_command(f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
 
-def minimize_energy(mdp_file, input_gro, output_gro, topology_file,em_tpr,em_edr,potential_xvg):
+def minimize_energy(mdp_file, input_gro, output_gro, topology_file,em_tpr,em_edr,potential_xvg, output_dir):
     """Perform energy minimization."""
     print("\n" + "="*100)
     print("[INFO] Performing energy minimization.")
     print("="*100)
-    run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {em_tpr}")
+    run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {em_tpr}", cwd=output_dir)
     run_command(f"gmx mdrun -v -deffnm {em_tpr.replace('.tpr','')}")
     run_command(f"echo '13 0' | gmx energy -f {em_edr} -o {potential_xvg}")
 
@@ -449,7 +449,7 @@ def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
     run_command(get_movie_gro)
     
     
-def make_refinement(topology_file, equilibration_tpr, em_gro):
+def make_refinement(topology_file, equilibration_tpr, em_gro, output_dir):
     print("\n" + "="*100)
     print("[INFO] Starting refinement (equilibrium) process.")
     print("="*100)
@@ -457,7 +457,7 @@ def make_refinement(topology_file, equilibration_tpr, em_gro):
     print("\n" + "*"*100)
     print("[INFO] 1) Preparing input files for equilibration: Running `gmx grompp`...")
     print("\n" + "*"*100)
-    run_command(f"gmx grompp -f {EQUILIBRATION_MDP} -c {em_gro} -p {topology_file} -o {equilibration_tpr}")
+    run_command(f"gmx grompp -f {EQUILIBRATION_MDP} -c {em_gro} -p {topology_file} -o {equilibration_tpr}", cwd=output_dir)
     
     print("\n" + "*"*100)
     print("[RUNNING] 2) Equilibration simulation: Running `gmx mdrun`...")
@@ -506,7 +506,7 @@ def get_refinement_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, 
     plot_eq(eq_potential_xvg,eq_pressure_xvg,eq_temperature_xvg,eq_rmsd_xvg,eq_rmsf_xvg,eq_gyrate_xvg,equilibration_analysis)
 
 
-def Run_NPT_Equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb):
+def Run_NPT_Equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb, output_dir):
     print("\n" + "="*100)
     print("[INFO] Starting additional refinement (equilibrium NPT) process.")
     print("="*100)
@@ -514,7 +514,7 @@ def Run_NPT_Equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb):
     print("\n" + "*"*100)
     print("[INFO] 1) Preparing input files for NPT equilibration: Running `gmx grompp`...")
     print("\n" + "*"*100)
-    run_command(f"gmx grompp -f {EQUILIBRATION_2_MDP} -c {nvt_gro} -p {topology_file} -o {npt_tpr}")
+    run_command(f"gmx grompp -f {EQUILIBRATION_2_MDP} -c {nvt_gro} -p {topology_file} -o {npt_tpr}", cwd=output_dir)
 
     print("\n" + "*"*100)
     print("[RUNNING] 2) NPT Equilibration simulation: Running `gmx mdrun`...")
@@ -582,12 +582,15 @@ def main():
     topology_file = os.path.join(output_dir, "topol.top")
     minimized_gro = os.path.join(output_dir, "minimized.gro")
     energy_plot = os.path.join(output_dir, f"{Project_dir}_potential.pdf")
+    ions_tpr = os.path.join(output_dir, "ions.tpr")   
     
     # actype dir
-    ligand_itp = atomtypes_file = os.path.join(os.getcwd(), f"{ligand_name}.acpype/{ligand_name}_GMX.itp") if ligand_file else ''
-    ligand_top = os.path.join(os.getcwd(), f"{ligand_name}.acpype/{ligand_name}_GMX.top") if ligand_file else ''
-    ligand_acpype = os.path.join(os.getcwd(), f"{ligand_name}.acpype/{ligand_name}_GMX.gro") if ligand_file else ''
-            
+    acpype_dir = os.path.join(output_dir, f"{ligand_name}.acpype") if ligand_file else ''
+    ligand_itp = atomtypes_file = os.path.join(acpype_dir, f"{ligand_name}_GMX.itp") if ligand_file else ''
+    ligand_top = os.path.join(acpype_dir, f"{ligand_name}_GMX.top") if ligand_file else ''
+    ligand_acpype = os.path.join(acpype_dir, f"{ligand_name}_GMX.gro") if ligand_file else ''
+    atomtypes_file = os.path.join(acpype_dir, "atomtypes.atp") if ligand_file else ''
+
     # Equilibration workflow
     equilibration_tpr = os.path.join(output_dir, "equilibration.tpr")
     equilibration_edr = os.path.join(output_dir, "equilibration.edr")
@@ -632,12 +635,12 @@ def main():
     
     equilibrator_steps = []
     # === Protein Topology ===
-    equilibrator_steps.append(("Generate topology for protein", lambda: generate_topology_protein(protein_file, topology_file, protein_gro)))
+    equilibrator_steps.append(("Generate topology for protein", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir)))
 
     # === Ligand Prep ===
     if ligand_file:
         equilibrator_steps.append(("Convert ligand PDB to MOL2", lambda: pdb_2_mol2(ligand_file, ligand_mol2)))
-        equilibrator_steps.append(("Generate topology for ligand", lambda: generate_topology_ligand(ligand_mol2, ligand_name)))
+        equilibrator_steps.append(("Generate topology for ligand", lambda: generate_topology_ligand(ligand_mol2, ligand_name, output_dir)))
 
     # === Merge Prep ===
     equilibrator_steps.append(("Prepare to merge topology file(s) if ligand provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, ligand_name, output_dir, ligand_file)))
@@ -649,23 +652,23 @@ def main():
     # === Simulation Setup ===
     equilibrator_steps.append(("Create the simulation box", lambda: create_simulation_box(protein_or_merged_gro, box_gro)))
     equilibrator_steps.append(("Solvate the system", lambda: solvate_system(box_gro, solvated_gro, topology_file)))
-    equilibrator_steps.append(("Add ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file)))
+    equilibrator_steps.append(("Add ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file, ions_tpr, output_dir)))
 
     # === Energy Minimization ===
-    equilibrator_steps.append(("Run energy minimization", lambda: minimize_energy(MINIM_MDP, solv_ions, minimized_gro, topology_file, em_tpr, em_edr, potential_xvg)))
+    equilibrator_steps.append(("Run energy minimization", lambda: minimize_energy(MINIM_MDP, solv_ions, minimized_gro, topology_file, em_tpr, em_edr, potential_xvg, output_dir)))
     equilibrator_steps.append(("Plot potential energy", lambda: plot_energy_results(potential_xvg, energy_plot)))
     equilibrator_steps.append(("Obtain potential, backbone, and pressure xvgs", lambda: get_potential_backbone_pressure_xvgs(em_edr, em_tpr, potential_xvg, rmsf_xvg, pressure_xvg, em_trr)))
     equilibrator_steps.append(("Plot panel of additional energy minimization results", lambda: plot_em_results(potential_xvg, pressure_xvg, rmsf_xvg, energy_minimization_results)))
     equilibrator_steps.append(("Get final minimized pdb structure", lambda: get_final_minimized_structure(em_tpr, em_trr, final_minimized)))
 
     # === NVT Equilibration ===
-    equilibrator_steps.append(("Run NVT equilibration", lambda: make_refinement(topology_file, equilibration_tpr, em_gro
+    equilibrator_steps.append(("Run NVT equilibration", lambda: make_refinement(topology_file, equilibration_tpr, em_gro, output_dir
     )))
     equilibrator_steps.append(("Get NVT equilibration output", lambda: get_refinement_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro
     )))
 
     #===NPT Equilibration ===
-    equilibrator_steps.append(("Run NPT equilibration", lambda: Run_NPT_Equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb
+    equilibrator_steps.append(("Run NPT equilibration", lambda: Run_NPT_Equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb, output_dir
     )))
     equilibrator_steps.append(("Get NPT equilibration output", lambda: get_refinement_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf, final_npt_gro
     )))
