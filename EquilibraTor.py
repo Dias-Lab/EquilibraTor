@@ -129,10 +129,11 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
             topology_lines.append(molecules_entry)
 
     # Remove specific lines from the list
-    topology_lines = [
-        line.replace('#include "topol_Protein_chain_A.itp"', '').replace('#include "topol_Protein_chain_B.itp"', '')
-        for line in topology_lines
-    ]
+    #topology_lines = [
+        #line.replace('#include "topol_Protein_chain_A.itp"', '').replace('#include "topol_Protein_chain_B.itp"', '')
+        #for line in topology_lines
+    #
+    #]
     
     with open(topology_file, "w") as top_file:
         top_file.writelines(topology_lines)
