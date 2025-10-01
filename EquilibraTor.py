@@ -15,7 +15,7 @@ MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp'
 EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
 EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
 
-VERSION = 'v0.1.2'
+VERSION = 'v0.1.3'
 
 DESCRIPTION = """
    ____          _ ___ __           ______        
@@ -45,7 +45,6 @@ def list_equilibrator_steps(pipeline_steps):
     for i, (name, _) in enumerate(pipeline_steps, 1):
         print(f"{i}: {name}")
 
-# Define utility functions
 def run_command(command, cwd=None):
     """Run a shell command."""
     try:
@@ -78,31 +77,32 @@ def generate_topology_protein(protein_file,topology_file,protein_gro,output_dir)
     print(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
     run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}", cwd=output_dir)
 
-
-def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_name, output_dir, ligand_provided):
+def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, molecule_names, output_dir, ligands_provided):
     """
-    Edits topology files to prepare for merging if ligand file provided.
+    Edits topology files to prepare for merging if ligand files provided.
 
     Parameters:
         topology_file (str): Path to the `topol.top` file.
-        ligand_itp (str): Path to the `.itp` file.
-        ligand_top (str): Path to the `.top` file.
-        molecule_name (str): Name of the molecule (e.g., 'baricitinib').
+        ligand_itp_list (list of str): List of ligand `.itp` files.
+        ligand_top_list (list of str): List of ligand `.top` files.
+        molecule_names (list of str): List of molecule names (e.g., ['lig1', 'lig2']).
+        ligands_provided (bool): Whether ligand files were provided.
     """
     print("\n" + "="*100)
-    print("[INFO]  Preparing to merge topologies if ligand provided.")
+    print("[INFO]  Preparing to merge topologies if ligand(s) provided.")
     print("="*100)
 
     with open(topology_file, "r") as top_file:
         topology_lines = top_file.readlines()
     
     #; Include chain topologies
-    if ligand_provided:
+    if ligands_provided:
         include_lines = [
-            f'; Include ligand topology\n',
-            f'#include "{os.path.join(output_dir, ligand_itp)}"\n',
-            f'#include "{os.path.join(output_dir, ligand_top)}"\n',   
+            f'; Include ligand topology\n'
         ]
+        for ligand_itp, ligand_top in zip(ligand_itp_list, ligand_top_list):
+            include_lines.append(f'#include "{os.path.join(output_dir, ligand_itp)}"\n')
+            include_lines.append(f'#include "{os.path.join(output_dir, ligand_top)}"\n')
         chain_includes_idx = next(
             (i for i, line in enumerate(topology_lines) 
              if line.strip() == '#include "amber99sb.ff/forcefield.itp"'),
@@ -111,8 +111,12 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
         if chain_includes_idx == -1:
             raise ValueError("Protein chain include lines not found in topol.top.")
         
-        if not any(ligand_itp in line for line in topology_lines):
-            # Insert the inclusion lines right after the strings
+        # Insert the inclusion lines if none of them already exist
+        if not any(
+            any(ligand_itp in line for ligand_itp in ligand_itp_list) or 
+            any(ligand_top in line for ligand_top in ligand_top_list) 
+            for line in topology_lines
+        ):
             topology_lines = (
                 topology_lines[:chain_includes_idx + 1] +
                 include_lines +
@@ -120,30 +124,27 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
                 topology_lines[chain_includes_idx + 1:]
             )
 
-        # Add the molecule information in the [ molecules ] section
-        molecules_entry = f"{molecule_name}         1\n"
+        # Add the molecule information in the [ molecules ] section for each ligand
         molecule_section_idx = next(
-            (i for i, line in enumerate(topology_lines) if line.strip().startswith("[ molecules ]")),-1)
+            (i for i, line in enumerate(topology_lines) if line.strip().startswith("[ molecules ]")),
+            -1
+        )
+        if molecule_section_idx != -1:
+            for molecule_name in molecule_names:
+                molecules_entry = f"{molecule_name}         1\n"
+                if molecules_entry not in topology_lines[molecule_section_idx:]:
+                    topology_lines.append(molecules_entry)
 
-        if molecule_section_idx != -1 and molecules_entry not in topology_lines[molecule_section_idx:]:
-            topology_lines.append(molecules_entry)
-
-    # Remove specific lines from the list
-    #topology_lines = [
-        #line.replace('#include "topol_Protein_chain_A.itp"', '').replace('#include "topol_Protein_chain_B.itp"', '')
-        #for line in topology_lines
-    #
-    #]
-    
     with open(topology_file, "w") as top_file:
         top_file.writelines(topology_lines)
 
     print(f"{topology_file} successfully updated")
 
-    if ligand_provided:
-        # Modify ligand top file
-        with open(ligand_top, "r") as ligand_top_file:
-            ligand_top_lines = ligand_top_file.readlines()
+    if ligands_provided:
+        for ligand_top in ligand_top_list:
+            # Modify ligand top file just like before
+            with open(ligand_top, "r") as ligand_top_file:
+                ligand_top_lines = ligand_top_file.readlines()
 
             modified_ligand_top = []
             in_defaults = False
@@ -169,28 +170,41 @@ def prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, molecule_
                 else:
                     modified_ligand_top.append(f"; {line}")
 
-        # write modified file
-        with open(ligand_top, "w") as ligand_top_file:
-            ligand_top_file.writelines(modified_ligand_top)
-        
-        print(f"{ligand_top} modified succesfully")
+            with open(ligand_top, "w") as ligand_top_file:
+                ligand_top_file.writelines(modified_ligand_top)
+            
+            print(f"{ligand_top} modified successfully")
 
-def merge_topologies(protein_gro, ligand_gro, output_gro, ligand_file):
+
+    
+def merge_topologies(protein_gro, ligand_gro_list, output_gro, ligands_provided):
     """Merge protein and ligand topologies."""
     print("\n" + "="*100)
     print("[INFO] Merging topologies for the protein-ligand complex.")
     print("="*100)
-    with open(protein_gro, 'r') as f1, open(ligand_gro, 'r') as f2, open(output_gro, 'w') as out:
+
+    # Read protein gro
+    with open(protein_gro, 'r') as f1:
         protein_lines = f1.readlines()
-        ligand_lines = f2.readlines()
-        total_atoms = int(protein_lines[1]) + int(ligand_lines[1])
-        out.write(protein_lines[0])
+
+    total_atoms = int(protein_lines[1])
+    merged_body_lines = protein_lines[2:-1]
+
+    # Read and append ligand gro files
+    if ligands_provided:
+        for ligand_gro in ligand_gro_list:
+            with open(ligand_gro, 'r') as lig_f:
+                ligand_lines = lig_f.readlines()
+                total_atoms += int(ligand_lines[1])
+                merged_body_lines.extend(ligand_lines[2:-1])
+
+    with open(output_gro, 'w') as out:
+        out.write(protein_lines[0])  # title line
         out.write(f"{total_atoms}\n")
-        out.writelines(protein_lines[2:-1])
-        out.writelines(ligand_lines[2:-1])
-        out.write(protein_lines[-1])
+        out.writelines(merged_body_lines)
+        out.write(protein_lines[-1])  # box vectors line
         
-def make_copy_of_protein(input_gro, output_gro, ligand_file):
+def make_copy_of_protein(input_gro, output_gro):
     """make copy of protein"""
     print("\n" + "="*100)
     print("[INFO]  Making a copy of the protein structure.")
@@ -211,75 +225,53 @@ def solvate_system(input_gro, output_gro, topology_file):
     print("="*100)
     run_command(f"gmx solvate -cp {input_gro} -cs spc216.gro -o {output_gro} -p {topology_file}")
 
-def modify_topology(atomtypes_file, topology_file):
-    """
-    Modifies the topology files to ensure that atom types are correctly defined.
 
-    Parameters:
-        atomtypes_file (str): Path to the file containing the [atomtypes] section (e.g., baricitinib_GMX.itp).
-        topology_file (str): Path to the main topology file (e.g., topol.top).
-    """
-    # Read the atomtypes file
-    with open(atomtypes_file, "r") as at_file:
-        lines = at_file.readlines()
+def combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file):
+    all_atomtypes = []
+    for ligand_itp in ligand_itp_list:
+        with open(ligand_itp, 'r') as f:
+            lines = f.readlines()
 
-    # Extract the [atomtypes] section
-    atomtypes_section = []
-    in_atomtypes = False
-    for line in lines:
-        if line.strip().startswith("[ atomtypes ]"):
-            in_atomtypes = True
-        elif line.strip().startswith("[") and in_atomtypes:
-            break  # Exit the section when another block definition is found
-        if in_atomtypes:
-            atomtypes_section.append(line)
+        atomtypes_section = []
+        in_atomtypes = False
+        for line in lines:
+            if line.strip().startswith("[ atomtypes ]"):
+                in_atomtypes = True
+            elif line.strip().startswith("[") and in_atomtypes:
+                break
+            if in_atomtypes:
+                atomtypes_section.append(line)
 
-    # Comment out the [atomtypes] section in the original file, preserving blank lines
-    modified_lines = [
-        f"; {line}" if line.strip() and line in atomtypes_section else line
-        for line in lines
-    ]
-    with open(atomtypes_file, "w") as at_file:
-        at_file.writelines(modified_lines)
+        # Comment out the atomtypes section in ligand .itp
+        modified_lines = [
+            f"; {line}" if line.strip() and line in atomtypes_section else line for line in lines
+        ]
+        with open(ligand_itp, 'w') as f:
+            f.writelines(modified_lines)
 
-    # Insert the [atomtypes] section into the beginning of topol.top, after the forcefield include
-    with open(topology_file, "r") as top_file:
-        topology_lines = top_file.readlines()
+        all_atomtypes.extend(atomtypes_section)
 
-    forcefield_idx = next(
-        (i for i, line in enumerate(topology_lines) if "forcefield.itp" in line), -1
-    )
-    if forcefield_idx == -1:
-        raise ValueError("Could not find the forcefield.itp include in topol.top")
+    # Remove duplicated lines while preserving order
+    seen = set()
+    unique_atomtypes = []
+    for line in all_atomtypes:
+        if line not in seen:
+            seen.add(line)
+            unique_atomtypes.append(line)
 
-    # Update the topology file
+    # Insert combined unique atomtypes section once into topol.top
+    with open(topology_file, 'r') as f:
+        topo_lines = f.readlines()
+
+    ff_index = next((i for i, l in enumerate(topo_lines) if "forcefield.itp" in l), -1)
+    if ff_index == -1:
+        raise ValueError("forcefield.itp not found in topology")
+
     updated_topology = (
-        topology_lines[:forcefield_idx + 1]
-        + ["\n"] + atomtypes_section + ["\n"]
-        + topology_lines[forcefield_idx + 1:]
+        topo_lines[:ff_index+1] + ["\n"] + unique_atomtypes + ["\n"] + topo_lines[ff_index+1:]
     )
-    with open(topology_file, "w") as top_file:
-        top_file.writelines(updated_topology)
-
-    print(f"Topology successfully modified: {topology_file}")
-
-def add_ions_with_modifications(mdp_file, input_gro, output_gro, topology_file, atomtypes_file):
-    """
-    Modifica os arquivos de topologia e adiciona íons ao sistema para neutralizá-lo.
-
-    Parameters:
-        mdp_file (str): Caminho para o arquivo .mdp.
-        input_gro (str): Arquivo .gro de entrada (e.g., sistema solventado).
-        output_gro (str): Arquivo .gro de saída (e.g., sistema com íons adicionados).
-        topology_file (str): Caminho para o arquivo de topologia principal.
-        atomtypes_file (str): Caminho para o arquivo contendo a seção [atomtypes].
-    """
-    # Modify topology files
-    modify_topology(atomtypes_file, topology_file)
-
-    # Perform ion addition
-    add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr)
-    print(f"Ions added successfully: {output_gro}")
+    with open(topology_file, 'w') as f:
+        f.writelines(updated_topology)
 
 def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir):
     """Add ions to the system."""
@@ -528,10 +520,11 @@ def main():
         description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
-        "-l", "--ligand", 
+        "-l", "--ligands", 
         required=False,
+        nargs='+', # accept multiple ligands
         type=str, 
-        help="Path to the ligand file."
+        help="Path(s) to the ligand file(s)."
     )
     parser.add_argument(
         "-p", "--protein", 
@@ -564,34 +557,48 @@ def main():
     args = parser.parse_args()
 
     # defining variable for input files 
-    ligand_file = args.ligand
+    ligand_files = args.ligands if args.ligands else []
+    
     protein_file = args.protein
     protein_name = os.path.splitext(os.path.basename(protein_file))[0]
-    ligand_name = os.path.splitext(os.path.basename(ligand_file))[0] if ligand_file else ''
-    Project_dir = f"{protein_name}_{ligand_name}" if ligand_file else protein_name
-            
+    ligand_names = [os.path.splitext(os.path.basename(lig))[0] for lig in ligand_files]
+    Project_dir = f"{protein_name}_{'_'.join(ligand_names)}" if ligand_files else protein_name
+    
     # Creating the directory to store outputs
     output_dir = os.path.join(os.getcwd(), Project_dir)
     os.makedirs(output_dir, exist_ok=True)
-    ligand_mol2 = os.path.join(output_dir, ligand_name + '.mol2') if ligand_file else ''
     protein_gro = os.path.join(output_dir, f"{protein_name}_processed.gro")
     protein_gro_complex = protein_gro.replace('.gro','_complex.gro')
     merged_gro = os.path.join(output_dir, "merged.gro")
-    protein_or_merged_gro = merged_gro if ligand_file else protein_gro        
+
+    #protein_or_merged_gro = merged_gro if ligand_file else protein_gro        
+    protein_or_merged_gro = merged_gro if ligand_files else protein_gro
+    
     box_gro = os.path.join(output_dir, "box.gro")
     solvated_gro = os.path.join(output_dir, "solvated.gro")
     topology_file = os.path.join(output_dir, "topol.top")
     minimized_gro = os.path.join(output_dir, "minimized.gro")
     energy_plot = os.path.join(output_dir, f"{Project_dir}_potential.pdf")
     ions_tpr = os.path.join(output_dir, "ions.tpr")   
-    
-    # actype dir
-    acpype_dir = os.path.join(output_dir, f"{ligand_name}.acpype") if ligand_file else ''
-    ligand_itp = atomtypes_file = os.path.join(acpype_dir, f"{ligand_name}_GMX.itp") if ligand_file else ''
-    ligand_top = os.path.join(acpype_dir, f"{ligand_name}_GMX.top") if ligand_file else ''
-    ligand_acpype = os.path.join(acpype_dir, f"{ligand_name}_GMX.gro") if ligand_file else ''
-    atomtypes_file = os.path.join(acpype_dir, "atomtypes.atp") if ligand_file else ''
 
+    # Prepare ligand related paths as lists
+    ligand_mol2_list = []
+    for ligand_file, ligand_name in zip(ligand_files, ligand_names):
+        ligand_mol2 = os.path.join(output_dir, f"{ligand_name}.mol2")
+        ligand_mol2_list.append(ligand_mol2)
+
+        
+    ligand_itp_list = []
+    ligand_top_list = []
+    ligand_acpype_gro_list = []
+    atomtypes_file_list = []
+    for ligand_name in ligand_names:
+        acpype_dir = os.path.join(output_dir, f"{ligand_name}.acpype")
+        ligand_itp_list.append(os.path.join(acpype_dir, f"{ligand_name}_GMX.itp"))
+        ligand_top_list.append(os.path.join(acpype_dir, f"{ligand_name}_GMX.top"))
+        ligand_acpype_gro_list.append(os.path.join(acpype_dir, f"{ligand_name}_GMX.gro"))
+        atomtypes_file_list.append(os.path.join(acpype_dir, "atomtypes.atp"))
+    
     # Equilibration workflow
     equilibration_tpr = os.path.join(output_dir, "equilibration.tpr")
     equilibration_edr = os.path.join(output_dir, "equilibration.edr")
@@ -639,22 +646,28 @@ def main():
     equilibrator_steps.append(("Generate topology for protein", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir)))
 
     # === Ligand Prep ===
-    if ligand_file:
-        equilibrator_steps.append(("Convert ligand PDB to MOL2", lambda: pdb_2_mol2(ligand_file, ligand_mol2)))
-        equilibrator_steps.append(("Generate topology for ligand", lambda: generate_topology_ligand(ligand_mol2, ligand_name, output_dir)))
-
+    for ligand_file, ligand_mol2, ligand_name in zip(ligand_files, ligand_mol2_list, ligand_names):
+        equilibrator_steps.append((f"Convert PDB to MOL2 for ligand {ligand_name}", lambda lf=ligand_file, lm=ligand_mol2: pdb_2_mol2(lf, lm)))
+        equilibrator_steps.append((f"Generate topology for ligand {ligand_name}", lambda lm=ligand_mol2, ln=ligand_name: generate_topology_ligand(lm, ln, output_dir)))
+    
     # === Merge Prep ===
-    equilibrator_steps.append(("Prepare to merge topology file(s) if ligand provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, ligand_name, output_dir, ligand_file)))
+    #equilibrator_steps.append(("Prepare to merge topology file(s) if ligand provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, ligand_name, output_dir, ligand_file)))
+    equilibrator_steps.append(("Prepare to merge topology file(s) if ligands provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, ligand_names, output_dir, bool(ligand_files))))
+        
+    
+    if ligand_files:
+        equilibrator_steps.append(("Make a copy of protein", lambda: make_copy_of_protein(protein_gro, protein_gro_complex)))
+        equilibrator_steps.append(("Merge topologies", lambda: merge_topologies(protein_gro_complex, ligand_acpype_gro_list, merged_gro, True)))
 
-    if ligand_file:
-        equilibrator_steps.append(("Make a copy of protein if ligand provided", lambda: make_copy_of_protein(protein_gro, protein_gro_complex, ligand_file)))
-        equilibrator_steps.append(("Merge topologies", lambda: merge_topologies(protein_gro_complex, ligand_acpype, merged_gro, ligand_file)))
-
+    ## Modify ligand itp(s) to comment [ atomtypes ] and update main topology before ion addition and minimization
+    equilibrator_steps.append(("Combine and insert unique atomtypes into main topology", lambda: combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file)))
+     
+    # Simulation setup
     # === Simulation Setup ===
     equilibrator_steps.append(("Create the simulation box", lambda: create_simulation_box(protein_or_merged_gro, box_gro)))
     equilibrator_steps.append(("Solvate the system", lambda: solvate_system(box_gro, solvated_gro, topology_file)))
     equilibrator_steps.append(("Add ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file, ions_tpr, output_dir)))
-
+    
     # === Energy Minimization ===
     equilibrator_steps.append(("Run energy minimization", lambda: minimize_energy(MINIM_MDP, solv_ions, minimized_gro, topology_file, em_tpr, em_edr, potential_xvg, output_dir)))
     equilibrator_steps.append(("Plot potential energy", lambda: plot_energy_results(potential_xvg, energy_plot)))
