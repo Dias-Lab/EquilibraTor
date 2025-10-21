@@ -4,18 +4,6 @@ EquilibraTor is a Python-based command-line tool that automates the setup and ex
 
 ## 🛠️  Installation
 
-### ✅ Prerequisites
-
-Ensure you have the following installed:
-
-- Python 3.8+
-- pip (Python package installer)
-- Git
-- Numpy
-- Matplotlib
-- GROMACS
-- Open Babel
-- ACPYPE
 ---
 ### Option 1:
 
@@ -28,8 +16,17 @@ pip install EquilibraTor
 Clone this repository to your local machine:
 
 ```bash
+# 1. clone the repository:
 git clone https://github.com/Dias-Lab/EquilibraTor.git
 cd EquilibraTor
+
+# 2. create conda environment using yaml file and activate it. Use mamba instead of conda for faster installation:
+   # with conda:
+   conda env create -f equilibrator_env.yml
+   conda activate EquilibraTor
+
+# 3. install the python package
+pip install -e .
 ```
 
 ---
@@ -52,16 +49,14 @@ cd EquilibraTor
 
 ## ⚙️ Usage
 
-If installed via `pip`, use only `equilibrator ...` otherwise `python EquilibraTor.py ...`
-
 To show EquilibraTor arguments:
 
 ```text
-python EquilibraTor.py -h
+EquilibraTor -h
 ```
 
 ```
-usage: EquilibraTor.py [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
+usage: EquilibraTor [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
@@ -97,7 +92,7 @@ options:
 To show the EquilibraTor steps to be performed for a protein file:
 
 ```Text
-python EquilibraTor.py -p example/example_protein.pdb -as
+EquilibraTor -p example/example_protein.pdb -as
 
 Available steps:
 1: Generate topology for protein
@@ -118,19 +113,19 @@ Available steps:
 To run EquilibraTor for a protein file:
 
 ```Text
-python EquilibraTor.py -p example/example_protein.pdb
+EquilibraTor -p example/example_protein.pdb
 ````
 
 If you want to tweak certain parameters for your current protein file and avoid running the entire Equilibrator workflow, you can specify only the steps you wish to execute:
 
 ```Text
-python EquilibraTor.py -p example/example_protein.pdb -fs 10 -ls 14
+EquilibraTor -p example/example_protein.pdb -fs 10 -ls 14
 ```
 
 To show the EquilibraTor steps to be performed when provided both protein and ligand files:
 
 ```Text
-python EquilibraTor.py -l example/example_ligand.pdb -p example/example_protein.pdb -as
+EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -as
 
 Available steps:
 1: Generate topology for protein
@@ -156,7 +151,7 @@ Available steps:
 To run EquilibraTor using this protein-ligand files:
 
 ```Text
-python EquilibraTor.py -l example/example_ligand.pdb -p example/example_protein.pdb
+EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb
 ```
 
 
