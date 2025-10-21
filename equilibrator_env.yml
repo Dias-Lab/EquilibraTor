@@ -1,0 +1,14 @@
+name: EquilibraTor
+channels:
+  - conda-forge
+  - defaults
+  - bioconda
+dependencies:
+  - python=3.11
+  - numpy
+  - matplotlib
+  - openbabel
+  - ambertools
+  - gromacs
+  - pip:
+      - acpype
