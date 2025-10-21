@@ -15,7 +15,7 @@ MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp'
 EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
 EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
 
-VERSION = 'v0.1.3'
+VERSION = 'v0.5.0'
 
 DESCRIPTION = """
    ____          _ ___ __           ______        
@@ -45,8 +45,9 @@ def list_equilibrator_steps(pipeline_steps):
     for i, (name, _) in enumerate(pipeline_steps, 1):
         print(f"{i}: {name}")
 
+
 def run_command(command, cwd=None):
-    """Run a shell command."""
+    #Run a shell command
     try:
         result = subprocess.run(command, shell=True, cwd=cwd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         print(result.stdout.decode())
@@ -61,22 +62,49 @@ def pdb_2_mol2(ligand_file, ligand_mol2):
     print(f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}")
     run_command(f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}")
 
-def generate_topology_ligand(ligand_file,ligand_name, output_dir):
+def generate_topology_ligand(ligand_file, ligand_name, output_dir, atom_type="gaff2", net_charge=0):
     """Generate ligand topology using ACPYPE."""
     print("\n" + "="*100)
     print("[INFO]  Generating topology for the ligand.")
     print("="*100)
-    print(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name}")
-    run_command(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name}", cwd=output_dir)
+    command = f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} -a {atom_type} -n {net_charge}"
+    print(command)
+    run_command(command, cwd=output_dir)
 
-def generate_topology_protein(protein_file,topology_file,protein_gro,output_dir):
+#def generate_topology_ligand(ligand_file,ligand_name,output_dir):
+    #"""Generate ligand topology using ACPYPE."""
+    #print("\n" + "="*100)
+    #print("[INFO]  Generating topology for the ligand.")
+    #print("="*100)
+    #print(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} -n 0")
+    #run_command(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} -n 0", cwd=output_dir)
+
+def generate_topology_protein(protein_file, topology_file, protein_gro, output_dir,
+                              force_field="amber99sb", water_model="tip3p"):
     """Generate protein topology using GROMACS."""
     print("\n" + "="*100)
     print("[INFO]  Generating topology for the protein.")
     print("="*100)
-    print(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
-    run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}", cwd=output_dir)
+    protein_file = os.path.abspath(protein_file)
+    topology_file = os.path.abspath(topology_file)
+    protein_gro = os.path.abspath(protein_gro)
+    output_dir = os.path.abspath(output_dir)
+    command = f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water {water_model} -ff {force_field} -ignh -p {topology_file}"
+    print(command)
+    run_command(command, cwd=output_dir)
 
+
+#def generate_topology_protein(protein_file,topology_file,protein_gro,output_dir):
+    #"""Generate protein topology using GROMACS."""
+    #print("\n" + "="*100)
+    #print("[INFO]  Generating topology for the protein.")
+    #print("="*100)
+    #protein_file = os.path.abspath(protein_file)
+    #topology_file = os.path.abspath(topology_file)
+    #protein_gro = os.path.abspath(protein_gro)
+    #print(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
+    #run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}", cwd=output_dir)
+    
 def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, molecule_names, output_dir, ligands_provided):
     """
     Edits topology files to prepare for merging if ligand files provided.
@@ -211,20 +239,41 @@ def make_copy_of_protein(input_gro, output_gro):
     print("="*100)
     run_command(f"gmx editconf -f {input_gro} -o {output_gro}")
     
-def create_simulation_box(input_gro, output_gro):
+def create_simulation_box(input_gro, output_gro, box_type="cubic", distance=1.2):
     """Create a simulation box."""
     print("\n" + "="*100)
     print("[INFO] Creating the simulation box.")
     print("="*100)
-    run_command(f"gmx editconf -f {input_gro} -o {output_gro} -c -d 1.2 -bt cubic")
+    run_command(f"gmx editconf -f {input_gro} -o {output_gro} -c -d {distance} -bt {box_type}")
 
-def solvate_system(input_gro, output_gro, topology_file):
-    """Add water to the system."""
+def solvate_system(input_gro, output_gro, topology_file, water_model="tip3p"):
+    """Add water to the system using the appropriate solvent configuration."""
     print("\n" + "="*100)
-    print("[INFO] Solvating the system.")
-    print("="*100)
-    run_command(f"gmx solvate -cp {input_gro} -cs spc216.gro -o {output_gro} -p {topology_file}")
+    print(f"[INFO] Solvating the system with {water_model.upper()} water model.")
+    print("="*100)    
+    # Map water models to their corresponding solvent configuration files
+    water_config_map = {
+        "spc": "spc216.gro",
+        "spce": "spc216.gro",      # SPC/E uses same coordinates as SPC
+        "tip3p": "spc216.gro",     # TIP3P uses 3-point coordinates (same as SPC)
+        "tip4p": "tip4p.gro",      # TIP4P has 4-point structure
+        "tip5p": "tip4p.gro"       # TIP5P not typically available, use tip4p.gro as fallback
+    }
+    # Get the appropriate configuration file
+    solvent_config = water_config_map.get(water_model.lower(), "spc216.gro")
+    
+    # Warn user if using fallback for TIP5P
+    if water_model.lower() == "tip5p":
+        print("[WARNING] TIP5P configuration file not standard in GROMACS.")
+        print("[WARNING] Using tip4p.gro coordinates. Geometry will adjust during equilibration.")
+    run_command(f"gmx solvate -cp {input_gro} -cs {solvent_config} -o {output_gro} -p {topology_file}")
 
+#def solvate_system(input_gro, output_gro, topology_file):
+    #"""Add water to the system."""
+    #print("\n" + "="*100)
+    #print("[INFO] Solvating the system.")
+    #print("="*100)
+    #run_command(f"gmx solvate -cp {input_gro} -cs spc216.gro -o {output_gro} -p {topology_file}")
 
 def combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file):
     all_atomtypes = []
@@ -273,15 +322,28 @@ def combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file):
     with open(topology_file, 'w') as f:
         f.writelines(updated_topology)
 
-def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir):
-    """Add ions to the system."""
+
+def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir, pos_ion="NA", neg_ion="CL"):
+    """Add user-specified ions to the system."""
     print("\n" + "="*100)
-    print("[INFO] Adding ions to the system.")
+    print(f"[INFO] Adding ions: +ion={pos_ion}, -ion={neg_ion}")
     print("="*100)
-    print (f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}")
-    run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}", cwd=output_dir)
-    print (f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
-    run_command(f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
+    grompp = f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}"
+    print(grompp)
+    run_command(grompp, cwd=output_dir)
+    genion = f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname {pos_ion} -nname {neg_ion} -neutral"
+    print(genion)
+    run_command(genion, cwd=output_dir)
+
+#def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir):
+    #"""Add ions to the system."""
+    #print("\n" + "="*100)
+    #print("[INFO] Adding ions to the system.")
+    #print("="*100)
+    #print (f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}")
+    #run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}", cwd=output_dir)
+    #print (f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
+    #run_command(f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
 
 def minimize_energy(mdp_file, input_gro, output_gro, topology_file,em_tpr,em_edr,potential_xvg, output_dir):
     """Perform energy minimization."""
@@ -519,33 +581,103 @@ def main():
     parser = argparse.ArgumentParser(
         description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument(
+    
+    input_group = parser.add_argument_group("Input options")
+    input_group.add_argument(
         "-l", "--ligands", 
         required=False,
         nargs='+', # accept multiple ligands
         type=str, 
         help="Path(s) to the ligand file(s)."
     )
-    parser.add_argument(
+    input_group.add_argument(
         "-p", "--protein", 
         required=True, 
         type=str, 
         help="Path to the protein file."
     )
-    parser.add_argument(
+
+    acpype_group = parser.add_argument_group("Specify options for ligand topology generation with acpype")
+    acpype_group.add_argument(
+	"-aa", "--atom_type",
+	required=False,
+	type=str,
+	default="gaff2",
+	help="Specify the atom type supported by acpype: gaff, amber, gaff2 (default), amber2"
+    )
+    acpype_group.add_argument(
+	"-an", "--net_charge",
+	required=False,
+	type=int,
+	default=0,
+	help="net molecular charge (int), default is -an=0"
+    )
+    
+    gromacs_topology_group = parser.add_argument_group("Specify options for protein topology generation with gromacs")
+    gromacs_topology_group.add_argument(
+	"-gff", "--force_field",
+	required=False,
+	type=str,
+	default="amber99sb",
+	help="Specify the Force Fields supported by GROMACS: amber94, amber96, amber99, amber99sb (default), amber99sb-ildn, amber03, ambergs"
+    )
+    gromacs_topology_group.add_argument(
+	"-gwm", "--water_model",
+	required=False,
+	type=str,
+	default="tip3p",
+	help="Specify the water model: none, spc, spce, tip3p (default), tip4p, tip5p"
+    )
+
+    gromacs_box_group = parser.add_argument_group("Specify options for box generation with gromacs")
+    gromacs_box_group.add_argument(
+        "-gbt", "--box_type",
+        required=False,
+        type=str,
+        default="cubic",
+        help="Specify the box type supported by GROMACS: triclinic, cubic (default), dodecahedron, octahedron"
+    )
+    gromacs_box_group.add_argument(
+	"-gd", "--distance",
+        required=False,
+        type=int,
+        default=1.2,
+        help="Specify the distance between the solute and the box, default is -gd 1.2"
+    )
+
+    gromacs_ions_group = parser.add_argument_group("Specify monoatomic cation/anion supported by the force field")
+    gromacs_ions_group.add_argument(
+        "-gpi", "--pos_ion",
+        required=False,
+	type=str,
+        default="NA",
+        help="Specify the monoatomic cation supported by the force field: NA (default), K, MG, etc"
+    )
+    gromacs_ions_group.add_argument(
+	"-gni", "--neg_ion",
+        required=False,
+        type=str,
+        default="CL",
+        help="Specify the monoatomic anion supported by the force field: CL (default), F, BR, etc"
+    )
+
+
+
+    steps_group = parser.add_argument_group("Specify the steps for the execution")
+    steps_group.add_argument(
         "-fs", "--first_step",
         required=False,
         type=int,
         default=1,
         help="Step number to start Equilibratior from (1-based)"
     )
-    parser.add_argument(
+    steps_group.add_argument(
         "-ls", "--last_step",
         required=False,
         type=int,
         help="Step number to end at (1-based)"
     )
-    parser.add_argument(
+    steps_group.add_argument(
         "-as", "--all_steps",
         required=False,
         action="store_true",
@@ -556,17 +688,21 @@ def main():
     # Parse arguments
     args = parser.parse_args()
 
+    # print EquilibraTor logo
+    print(DESCRIPTION)
+    
     # defining variable for input files 
     ligand_files = args.ligands if args.ligands else []
     
     protein_file = args.protein
+    print(protein_file, args.protein)
     protein_name = os.path.splitext(os.path.basename(protein_file))[0]
     ligand_names = [os.path.splitext(os.path.basename(lig))[0] for lig in ligand_files]
     Project_dir = f"{protein_name}_{'_'.join(ligand_names)}" if ligand_files else protein_name
     
     # Creating the directory to store outputs
     output_dir = os.path.join(os.getcwd(), Project_dir)
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)    
     protein_gro = os.path.join(output_dir, f"{protein_name}_processed.gro")
     protein_gro_complex = protein_gro.replace('.gro','_complex.gro')
     merged_gro = os.path.join(output_dir, "merged.gro")
@@ -586,7 +722,6 @@ def main():
     for ligand_file, ligand_name in zip(ligand_files, ligand_names):
         ligand_mol2 = os.path.join(output_dir, f"{ligand_name}.mol2")
         ligand_mol2_list.append(ligand_mol2)
-
         
     ligand_itp_list = []
     ligand_top_list = []
@@ -643,17 +778,16 @@ def main():
     
     equilibrator_steps = []
     # === Protein Topology ===
-    equilibrator_steps.append(("Generate topology for protein", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir)))
+    equilibrator_steps.append(("Generate topology for protein", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
 
     # === Ligand Prep ===
-    for ligand_file, ligand_mol2, ligand_name in zip(ligand_files, ligand_mol2_list, ligand_names):
-        equilibrator_steps.append((f"Convert PDB to MOL2 for ligand {ligand_name}", lambda lf=ligand_file, lm=ligand_mol2: pdb_2_mol2(lf, lm)))
-        equilibrator_steps.append((f"Generate topology for ligand {ligand_name}", lambda lm=ligand_mol2, ln=ligand_name: generate_topology_ligand(lm, ln, output_dir)))
-    
+    for ligand_file, ligand_mol2, ligand_name in zip(ligand_files, ligand_mol2_list, ligand_names):	
+    	equilibrator_steps.append((f"Convert PDB to MOL2 for ligand {ligand_name}", lambda lf=ligand_file, lm=ligand_mol2: pdb_2_mol2(lf, lm)))
+    	equilibrator_steps.append((f"Generate topology for ligand {ligand_name}", lambda lm=ligand_mol2, ln=ligand_name: generate_topology_ligand(lm, ln, output_dir, atom_type=args.atom_type, net_charge=args.net_charge)))
+
     # === Merge Prep ===
     #equilibrator_steps.append(("Prepare to merge topology file(s) if ligand provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, ligand_name, output_dir, ligand_file)))
     equilibrator_steps.append(("Prepare to merge topology file(s) if ligands provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, ligand_names, output_dir, bool(ligand_files))))
-        
     
     if ligand_files:
         equilibrator_steps.append(("Make a copy of protein", lambda: make_copy_of_protein(protein_gro, protein_gro_complex)))
@@ -664,9 +798,9 @@ def main():
      
     # Simulation setup
     # === Simulation Setup ===
-    equilibrator_steps.append(("Create the simulation box", lambda: create_simulation_box(protein_or_merged_gro, box_gro)))
-    equilibrator_steps.append(("Solvate the system", lambda: solvate_system(box_gro, solvated_gro, topology_file)))
-    equilibrator_steps.append(("Add ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file, ions_tpr, output_dir)))
+    equilibrator_steps.append(("Create the simulation box", lambda: create_simulation_box(protein_or_merged_gro, box_gro, box_type=args.box_type, distance=args.distance)))
+    equilibrator_steps.append(("Solvate the system", lambda: solvate_system(box_gro, solvated_gro, topology_file, water_model=args.water_model)))
+    equilibrator_steps.append(("Add ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file, ions_tpr, output_dir, pos_ion=args.pos_ion, neg_ion=args.neg_ion)))
     
     # === Energy Minimization ===
     equilibrator_steps.append(("Run energy minimization", lambda: minimize_energy(MINIM_MDP, solv_ions, minimized_gro, topology_file, em_tpr, em_edr, potential_xvg, output_dir)))
