@@ -594,7 +594,7 @@ def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
 
 def run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir):
     """Run NVT equilibration with robust error handling."""
-    grompp_cmd = f"gmx grompp -f {NVT_MDP} -c {em_gro} -p {topology_file} -o {equilibration_tpr}"
+    grompp_cmd = f"gmx grompp -f {NVT_MDP} -c {em_gro} -r {em_gro} -p {topology_file} -o {equilibration_tpr}"
     mdrun_cmd = f"gmx mdrun -s {equilibration_tpr} -deffnm {equilibration_tpr.replace('.tpr','')}"
 
     try:
@@ -643,7 +643,7 @@ def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xv
 
 def run_NPT_equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb, output_dir):
     """Run NPT equilibration with robust error handling."""
-    grompp_cmd = f"gmx grompp -f {NPT_MDP} -c {nvt_gro} -p {topology_file} -o {npt_tpr}"
+    grompp_cmd = f"gmx grompp -f {NPT_MDP} -c {nvt_gro} -r {nvt_gro} -p {topology_file} -o {npt_tpr}"
     mdrun_cmd = f"gmx mdrun -s {npt_tpr} -deffnm {npt_tpr.replace('.tpr','')}"
 
     try:
