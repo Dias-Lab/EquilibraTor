@@ -10,5 +10,6 @@ dependencies:
   - openbabel
   - ambertools
   - gromacs
+  - pip
   - pip:
       - acpype
