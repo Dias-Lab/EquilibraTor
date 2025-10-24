@@ -118,8 +118,9 @@ Specify the steps for the execution:
 ## 📌 Note
 
 - Only the protein file is required as input. 
+- Multiple ligands can be provided, each into a separate PDB file
 - When the ligand is a polypeptide or another protein, it must be combined with the main protein into a single PDB file and provided using the -p option.
-- Default .mdp files (ions.mdp, minim.mdp, equilibration.mdp, equilibration_2.mdp) are in equilibrator/flat. Modify them directly to change parameters.
+- Default .mdp files (ions.mdp, minimization_stage.mdp, nvt_stage.mdp, npt_stage.mdp, production_stage.mdp) are in equilibrator/flat. Modify them directly to change parameters.
 
 
 To show the EquilibraTor steps to be performed for a protein file:
