@@ -56,7 +56,9 @@ EquilibraTor -h
 ```
 
 ```
-usage: EquilibraTor [-h] [-l LIGAND] -p PROTEIN [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
+usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp]
+                    [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}] [-gwm {spc,spce,tip3p,tip4p,tip5p}]
+                    [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}] [-gni {CL,F,BR}] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
@@ -67,14 +69,45 @@ Equilibrator streamlines Molecular dynamics and equilibration simulations for pr
 Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
-Version:v0.1.1
+Version:v1.0.0
 
 options:
   -h, --help            show this help message and exit
-  -l LIGAND, --ligand LIGAND
-                        Path to the ligand file.
+
+Input options:
+  -l LIGANDS [LIGANDS ...], --ligands LIGANDS [LIGANDS ...]
+                        Path(s) to the ligand file(s).
   -p PROTEIN, --protein PROTEIN
                         Path to the protein file.
+
+Specify options for ligand topology generation with acpype:
+  -aa {gaff,amber,gaff2,amber2}, --atom_type {gaff,amber,gaff2,amber2}
+                        Specify the atom type supported by acpype: gaff, amber, gaff2 (default), amber2
+  -an NET_CHARGE, --net_charge NET_CHARGE
+                        net molecular charge (int), default is -an=0
+
+Protein termini capping before protein topology generation:
+  -cp, --cap_protein    Add ACE and NME terminal capping groups to the input protein PDB
+
+Specify options for protein topology generation with gromacs:
+  -gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}, --force_field {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}
+                        Specify the Force Fields supported by GROMACS: amber94, amber96, amber99, amber99sb (default), amber99sb-ildn, amber03
+  -gwm {spc,spce,tip3p,tip4p,tip5p}, --water_model {spc,spce,tip3p,tip4p,tip5p}
+                        Specify the water model: spc, spce, tip3p (default), tip4p, tip5p
+
+Specify options for box generation with gromacs:
+  -gbt {triclinic,cubic,dodecahedron,octahedron}, --box_type {triclinic,cubic,dodecahedron,octahedron}
+                        Specify the box type supported by GROMACS: triclinic, cubic (default), dodecahedron, octahedron
+  -gd DISTANCE, --distance DISTANCE
+                        Specify the distance between the solute and the box, default is -gd 1.2
+
+Specify monoatomic cation/anion supported by the force field:
+  -gpi {NA,K,MG}, --pos_ion {NA,K,MG}
+                        Specify the monoatomic cation supported by the force field: NA (default), K, MG, etc
+  -gni {CL,F,BR}, --neg_ion {CL,F,BR}
+                        Specify the monoatomic anion supported by the force field: CL (default), F, BR, etc
+
+Specify the steps for the execution:
   -fs FIRST_STEP, --first_step FIRST_STEP
                         Step number to start Equilibratior from (1-based)
   -ls LAST_STEP, --last_step LAST_STEP
