@@ -127,22 +127,72 @@ To show the EquilibraTor steps to be performed for a protein file:
 ```Text
 EquilibraTor -p example/example_protein.pdb -as
 
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v1.0.0
 Available steps:
-1: Generate topology for protein
-2: Prepare to merge topology file(s) if ligand provided
-3: Create the simulation box
-4: Solvate the system
-5: Add ions to neutralize the system
-6: Run energy minimization
-7: Plot potential energy
-8: Obtain potential, backbone, and pressure xvgs
-9: Plot panel of additional energy minimization results
-10: Get final minimized pdb structure
-11: Run NVT equilibration
-12: Get NVT equilibration output
-13: Run NPT equilibration
-14: Get NPT equilibration output
+1: Generating topology for the protein: example_protein
+2: Checking wether merging topology file(s) is necessary
+3: Combining and inserting unique atomtypes into main topology
+4: Creating the simulation box
+5: Solvating the system
+6: Adding ions to neutralize the system
+7: Running energy minimization
+8: Plotting potential energy
+9: Obtaining potential, backbone, and pressure xvgs
+10: Plotting panel of additional energy minimization results
+11: Getting final minimized pdb structure
+12: Running NVT equilibration
+13: Getting NVT equilibration output
+14: Running NPT equilibration
+15: Getting NPT equilibration output
+16: Running Production stage
+17: Getting Production output
 ```
+
+
+To show the EquilibraTor steps to be performed for a protein file, when the protein capping feature is enabled:
+
+```
+EquilibraTor -p example/example_protein.pdb -cp -as
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v1.0.0
+Available steps:
+1: Adding ACE and NME terminal capping groups to the protein: example_protein
+2: Generating topology for the protein: example_protein_capped.pdb
+3: Checking wether merging topology file(s) is necessary
+4: Combining and inserting unique atomtypes into main topology
+5: Creating the simulation box
+6: Solvating the system
+7: Adding ions to neutralize the system
+8: Running energy minimization
+9: Plotting potential energy
+10: Obtaining potential, backbone, and pressure xvgs
+11: Plotting panel of additional energy minimization results
+12: Getting final minimized pdb structure
+13: Running NVT equilibration
+14: Getting NVT equilibration output
+15: Running NPT equilibration
+16: Getting NPT equilibration output
+17: Running Production stage
+18: Getting Production output
+```
+
 To run EquilibraTor for a protein file:
 
 ```Text
@@ -159,26 +209,78 @@ To show the EquilibraTor steps to be performed when provided both protein and li
 
 ```Text
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -as
-
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v1.0.0
 Available steps:
-1: Generate topology for protein
-2: Convert ligand PDB to MOL2
-3: Generate topology for ligand
-4: Prepare to merge topology file(s) if ligand provided
-5: Make a copy of protein if ligand provided
-6: Merge topologies
-7: Create the simulation box
-8: Solvate the system
-9: Add ions to neutralize the system
-10: Run energy minimization
-11: Plot potential energy
-12: Obtain potential, backbone, and pressure xvgs
-13: Plot panel of additional energy minimization results
-14: Get final minimized pdb structure
-15: Run NVT equilibration
-16: Get NVT equilibration output
-17: Run NPT equilibration
-18: Get NPT equilibration output
+1: Generating topology for the protein: example_protein
+2: Converting example_ligand PDB to MOL2
+3: Generating topology for the ligand: example_ligand
+4: Checking wether merging topology file(s) is necessary
+5: Making a copy of the protein: example/example_protein.pdb
+6: Merging topologies
+7: Combining and inserting unique atomtypes into main topology
+8: Creating the simulation box
+9: Solvating the system
+10: Adding ions to neutralize the system
+11: Running energy minimization
+12: Plotting potential energy
+13: Obtaining potential, backbone, and pressure xvgs
+14: Plotting panel of additional energy minimization results
+15: Getting final minimized pdb structure
+16: Running NVT equilibration
+17: Getting NVT equilibration output
+18: Running NPT equilibration
+19: Getting NPT equilibration output
+20: Running Production stage
+21: Getting Production output
+```
+To show the EquilibraTor steps to be performed when provided both protein and ligand files, enabling the protein capping feature:
+
+```
+EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -cp -as
+
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v1.0.0
+Available steps:
+1: Adding ACE and NME terminal capping groups to the protein: example_protein
+2: Generating topology for the protein: example_protein_capped.pdb
+3: Converting example_ligand PDB to MOL2
+4: Generating topology for the ligand: example_ligand
+5: Checking wether merging topology file(s) is necessary
+6: Making a copy of the protein: example/example_protein.pdb
+7: Merging topologies
+8: Combining and inserting unique atomtypes into main topology
+9: Creating the simulation box
+10: Solvating the system
+11: Adding ions to neutralize the system
+12: Running energy minimization
+13: Plotting potential energy
+14: Obtaining potential, backbone, and pressure xvgs
+15: Plotting panel of additional energy minimization results
+16: Getting final minimized pdb structure
+17: Running NVT equilibration
+18: Getting NVT equilibration output
+19: Running NPT equilibration
+20: Getting NPT equilibration output
+21: Running Production stage
+22: Getting Production output
+
 ```
 
 To run EquilibraTor using this protein-ligand files:
