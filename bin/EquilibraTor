@@ -10,6 +10,7 @@ import subprocess
 import numpy as np
 import equilibrator.flat
 import matplotlib.pyplot as plt
+from utils.termini_capping import cap_protein
 
 ## Constants
 IONS_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'ions.mdp')
@@ -123,6 +124,13 @@ def generate_topology_ligand(ligand_file, ligand_name, output_dir, atom_type="ga
             f"Failed to generate topology for {ligand_file} (name: {ligand_name}): {e}"
         )
 
+def termini_capping(input_pdb, protein_capped_out, do_capping=False):
+    """
+    Optionally cap protein termini with ACE and NME before topology generation.
+    """
+    if do_capping:
+       cap_protein(input_pdb, protein_capped_out)
+               
 def generate_topology_protein(protein_file, topology_file, protein_gro, output_dir,
                               force_field="amber99sb", water_model="tip3p"):
     """Generate protein topology using GROMACS with robust error handling."""
@@ -675,7 +683,7 @@ def run_production_stage(topology_file, production_tpr, npt_gro, output_dir):
     except Exception as e:
         logging.error(f"Failed to run mdrun for production stage: {e}")
         raise
-    
+
 # Workflow execution
 def main():
     parser = argparse.ArgumentParser(
@@ -713,15 +721,23 @@ def main():
 	default=0,
 	help="net molecular charge (int), default is -an=0"
     )
+
+    termini_capping_group =  parser.add_argument_group("Protein termini capping before protein topology generation")
+    termini_capping_group.add_argument(
+	"-cp", "--cap_protein",
+	required=False,
+	action="store_true",
+	help="Add ACE and NME terminal capping groups to the input protein PDB"
+    )
     
     gromacs_topology_group = parser.add_argument_group("Specify options for protein topology generation with gromacs")
     gromacs_topology_group.add_argument(
 	"-gff", "--force_field",
 	required=False,
 	type=str,
-	choices=["amber94", "amber96", "amber99", "amber99sb", "amber99sb-ildn", "amber03", "ambergs"],
+	choices=["amber94", "amber96", "amber99", "amber99sb", "amber99sb-ildn", "amber03"],
 	default="amber99sb",
-	help="Specify the Force Fields supported by GROMACS: amber94, amber96, amber99, amber99sb (default), amber99sb-ildn, amber03, ambergs"
+	help="Specify the Force Fields supported by GROMACS: amber94, amber96, amber99, amber99sb (default), amber99sb-ildn, amber03"
     )
     gromacs_topology_group.add_argument(
 	"-gwm", "--water_model",
@@ -797,15 +813,17 @@ def main():
     
     # defining variable for input files 
     ligand_files = args.ligands if args.ligands else []
-    
+
     protein_file = args.protein
+    protein_capped = os.path.basename(args.protein).replace(".pdb", "_capped.pdb") if args.cap_protein else ""
     protein_name = os.path.splitext(os.path.basename(protein_file))[0]
     ligand_names = [os.path.splitext(os.path.basename(lig))[0] for lig in ligand_files]
     Project_dir = f"{protein_name}_{'_'.join(ligand_names)}" if ligand_files else protein_name
     
     # Creating the directory to store outputs
     output_dir = os.path.join(os.getcwd(), Project_dir)
-    os.makedirs(output_dir, exist_ok=True)    
+    os.makedirs(output_dir, exist_ok=True)
+    protein_capped_out = os.path.join(output_dir, protein_capped) if args.cap_protein else ""
     protein_gro = os.path.join(output_dir, f"{protein_name}_processed.gro")
     protein_gro_complex = protein_gro.replace('.gro','_complex.gro')
     merged_gro = os.path.join(output_dir, "merged.gro")
@@ -895,8 +913,15 @@ def main():
     production_analysis_pdf = os.path.join(output_dir, f"{Project_dir}_production_analysis.pdf")
 
     equilibrator_steps = []
+    # === Protein Capping ===
+    if args.cap_protein:
+       equilibrator_steps.append((f"Adding ACE and NME terminal capping groups to the protein: {protein_name}", lambda: termini_capping(protein_file, protein_capped_out, do_capping=args.cap_protein)))
+        
     # === Protein Topology ===
-    equilibrator_steps.append((f"Generating topology for the protein: {protein_name}", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
+    if args.cap_protein:
+        equilibrator_steps.append((f"Generating topology for the protein: {protein_capped}", lambda: generate_topology_protein(protein_capped_out, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
+    else:
+        equilibrator_steps.append((f"Generating topology for the protein: {protein_name}", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
 
     # === Ligand Prep ===
     for ligand_file, ligand_mol2, ligand_name in zip(ligand_files, ligand_mol2_list, ligand_names):	
