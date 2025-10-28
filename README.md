@@ -56,9 +56,9 @@ EquilibraTor -h
 ```
 
 ```
-usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp]
-                    [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}] [-gwm {spc,spce,tip3p,tip4p,tip5p}]
-                    [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}] [-gni {CL,F,BR}] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
+usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp] [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}]
+                    [-gwm {spc,spce,tip3p,tip4p,tip5p}] [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}] [-gni {CL,F,BR}] [-oth OBS_THRESHOLDS [OBS_THRESHOLDS ...]] [-rao]
+                    [-bs BLOCK_SIZE] [-wsb WINDOW_SIZE_BLOCKS] [-ov OVERLAP] [-rc RMSD_CUTOFF] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
@@ -66,7 +66,8 @@ usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
@@ -91,7 +92,7 @@ Protein termini capping before protein topology generation:
 
 Specify options for protein topology generation with gromacs:
   -gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}, --force_field {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}
-                        Specify the Force Fields supported by GROMACS: amber94, amber96, amber99, amber99sb (default), amber99sb-ildn, amber03
+                        Specify the Force Fields supported by GROMACS
   -gwm {spc,spce,tip3p,tip4p,tip5p}, --water_model {spc,spce,tip3p,tip4p,tip5p}
                         Specify the water model: spc, spce, tip3p (default), tip4p, tip5p
 
@@ -106,6 +107,19 @@ Specify monoatomic cation/anion supported by the force field:
                         Specify the monoatomic cation supported by the force field: NA (default), K, MG, etc
   -gni {CL,F,BR}, --neg_ion {CL,F,BR}
                         Specify the monoatomic anion supported by the force field: CL (default), F, BR, etc
+
+Automated checks to identify representative structures from converged trajectories:
+  -oth OBS_THRESHOLDS [OBS_THRESHOLDS ...], --obs_thresholds OBS_THRESHOLDS [OBS_THRESHOLDS ...]
+                        Relative drift thresholds for slope/drift equilibration detection (default: 10% drift, i.e. 0.10) Specify as observable=value pairs, e.g., rmsd=0.1 potential=0.2 rgyr=0.1 pressure=0.2. For relative thresholds, the value is multiplied by the standard deviation of the last half of the trajectory. If omitted, default values are used for all enabled observables. Example: rmsd=0.10 sets the RMSD drift tolerance to 10% of the reference noise.
+  -rao, --req_all_obs   If set, fill in missing observables with defaults. Otherwise, only use user-specified observables.
+  -bs BLOCK_SIZE, --block_size BLOCK_SIZE
+                        The amount of time (in ps) for each block (default: 100)
+  -wsb WINDOW_SIZE_BLOCKS, --window_size_blocks WINDOW_SIZE_BLOCKS
+                        Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 5)
+  -ov OVERLAP, --overlap OVERLAP
+                        The amount of time overlap (in ps) between consecutive blocks.(default: 0)
+  -rc RMSD_CUTOFF, --rmsd_cutoff RMSD_CUTOFF
+                        RMSD cutoff in nm for clustering structures using the GROMOS method (default: 0.2 nm)
 
 Specify the steps for the execution:
   -fs FIRST_STEP, --first_step FIRST_STEP
@@ -134,7 +148,8 @@ EquilibraTor -p example/example_protein.pdb -as
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
@@ -148,7 +163,7 @@ Available steps:
 7: Running energy minimization
 8: Plotting potential energy
 9: Obtaining potential, backbone, and pressure xvgs
-10: Plotting panel of additional energy minimization results
+10: Plotting additional energy minimization metrics
 11: Getting final minimized pdb structure
 12: Running NVT equilibration
 13: Getting NVT equilibration output
@@ -156,6 +171,7 @@ Available steps:
 15: Getting NPT equilibration output
 16: Running Production stage
 17: Getting Production output
+18: Getting convergence and clustering
 ```
 
 
@@ -163,13 +179,15 @@ To show the EquilibraTor steps to be performed for a protein file, when the prot
 
 ```
 EquilibraTor -p example/example_protein.pdb -cp -as
+
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
@@ -184,7 +202,7 @@ Available steps:
 8: Running energy minimization
 9: Plotting potential energy
 10: Obtaining potential, backbone, and pressure xvgs
-11: Plotting panel of additional energy minimization results
+11: Plotting additional energy minimization metrics
 12: Getting final minimized pdb structure
 13: Running NVT equilibration
 14: Getting NVT equilibration output
@@ -192,6 +210,7 @@ Available steps:
 16: Getting NPT equilibration output
 17: Running Production stage
 18: Getting Production output
+19: Getting convergence and clustering
 ```
 
 To run EquilibraTor for a protein file:
@@ -200,10 +219,10 @@ To run EquilibraTor for a protein file:
 EquilibraTor -p example/example_protein.pdb
 ````
 
-If you want to tweak certain parameters for your current protein file and avoid running the entire Equilibrator workflow, you can specify only the steps you wish to execute:
+If you want to tweak certain parameters for your EquilibraTor workflow (e.g., NPT equilibration), you can specify to run it from 14 step to the 15 step, without having to run again from topology to minimnization:
 
 ```Text
-EquilibraTor -p example/example_protein.pdb -fs 10 -ls 14
+EquilibraTor -p example/example_protein.pdb -fs 14 -ls 15
 ```
 
 To show the EquilibraTor steps to be performed when provided both protein and ligand files:
@@ -216,7 +235,8 @@ EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -as
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
@@ -234,7 +254,7 @@ Available steps:
 11: Running energy minimization
 12: Plotting potential energy
 13: Obtaining potential, backbone, and pressure xvgs
-14: Plotting panel of additional energy minimization results
+14: Plotting additional energy minimization metrics
 15: Getting final minimized pdb structure
 16: Running NVT equilibration
 17: Getting NVT equilibration output
@@ -242,6 +262,7 @@ Available steps:
 19: Getting NPT equilibration output
 20: Running Production stage
 21: Getting Production output
+22: Getting convergence and clustering
 ```
 To show the EquilibraTor steps to be performed when provided both protein and ligand files, enabling the protein capping feature:
 
@@ -254,7 +275,8 @@ EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -cp -a
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
@@ -273,7 +295,7 @@ Available steps:
 12: Running energy minimization
 13: Plotting potential energy
 14: Obtaining potential, backbone, and pressure xvgs
-15: Plotting panel of additional energy minimization results
+15: Plotting additional energy minimization metrics
 16: Getting final minimized pdb structure
 17: Running NVT equilibration
 18: Getting NVT equilibration output
@@ -281,10 +303,14 @@ Available steps:
 20: Getting NPT equilibration output
 21: Running Production stage
 22: Getting Production output
-
+23: Getting convergence and clustering
 ```
 
 To run EquilibraTor using this protein-ligand files:
+
+```Text
+EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb
+```
 
 ```Text
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb
@@ -298,3 +324,53 @@ EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb
 
 ### Equilibration PDB last frame
 <img src="paper/figures/protein-ligand_eq_last_frame.png">
+
+## Convergence analysis
+EquilibraTor features an automated module for determining when a MD simulation reaches equilibrium. This analysis uses block-based statistical methods to detect stability in key observables, ensuring that only equilibrated segments are used for representative structure clustering and post-simulation analysis.
+
+## Method Overview
+EquilibraTor divides the trajectory into consecutive time blocks and computes the drift (slope) of several observables, such as RMSD, potential energy, pressure, and radius of gyration. The program checks whether these observables have stabilized by comparing their computed drift against user-defined relative thresholds.
+
+Users define the acceptance thresholds via the `-oth` argument, for example:
+
+-oth rmsd=0.1 potential=0.2 pressure=0.2
+
+Each threshold specifies the maximum allowed drift as a fraction of the standard deviation of the last portion of the trajectory. When the measured drift of an observable falls below its threshold, the observable is considered stable, marking the onset of equilibration.
+
+If multiple observables are specified, EquilibraTor can assess them either individually or jointly, depending on whether the `-rao` flag (`--req_all_obs`) is used.
+
+## Output and Report Interpretation
+
+Following analysis, EquilibraTor automatically generates an **Equilibration Analysis Report**, which summarizes the equilibration point for each observable and identifies the equilibrated region of the trajectory.  
+
+Example report:
+
+```
+EQUILIBRATION ANALYSIS REPORT
+============================================================
+
+Analysis mode: Single observable (rmsd)
+Block size: 100 ps
+Block overlap: 0 ps
+Total simulation time: 10000.0 ps
+
+EQUILIBRATION TIMES BY OBSERVABLE:
+------------------------------------------------------------
+  rmsd                                       3400.0 ps (threshold=0.1)
+
+OTHER OBSERVABLES (analyzed but not used for equilibration):
+------------------------------------------------------------
+  production_potential.xvg                 [not used]
+  production_pressure.xvg                  [not used]
+  production_rmsd.xvg                      [not used]
+  production_gyrate.xvg                    [not used]
+
+------------------------------------------------------------
+FINAL EQUILIBRATION START: 3400.0 ps
+EQUILIBRATED SEGMENT: 3400.0 - 10000.0 ps
+EQUILIBRATED LENGTH: 6600.0 ps
+------------------------------------------------------------
+
+```
+
+In this example, RMSD reaches its stability threshold (0.1) at 3400 ps, marking the start of equilibration. The equilibrated segment spans from 3400 ps to the full 10000 ps trajectory, corresponding to a total equilibrated duration of 6600 ps. Only this portion is used for structural clustering, and representative frame extraction.
