@@ -4,9 +4,10 @@ nsteps                  = 5000000   ; 2 * 5000000 = 10000 ps (10 ns)
 dt                      = 0.002     ; 2 fs
 
 ; Output control
-nstenergy               = 5000      ; save energies every 10.0 ps
-nstlog                  = 5000      ; update log file every 10.0 ps
-nstxout-compressed      = 5000      ; save coordinates every 10.0 ps
+nstxout                  = 1000      ; Save coordinates every 2 ps
+nstvout                  = 1000      ; Save velocities every 2 ps
+nstenergy                = 1000      ; Save energies every 2 ps
+nstlog                   = 1000      ; Update log file every 2 ps
 
 ; Bond parameters
 continuation            = yes       ; continuing from NPT 
