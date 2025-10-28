@@ -3,19 +3,31 @@
 import os
 import re
 import sys
+import time
+import logging
 import argparse
 import subprocess
 import numpy as np
 import equilibrator.flat
 import matplotlib.pyplot as plt
+from utils.termini_capping import cap_protein
 
 ## Constants
 IONS_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'ions.mdp')
-MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minim.mdp')
-EQUILIBRATION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration.mdp')
-EQUILIBRATION_2_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'equilibration_2.mdp')
+MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minimization_stage.mdp')
+NVT_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'nvt_stage.mdp')
+NPT_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'npt_stage.mdp')
+PRODUCTION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'production_stage.mdp')
 
-VERSION = 'v0.5.0'
+# Dict of default relative thresholds for each observable
+DEFAULT_OBS_THRESHOLDS = {
+    "rmsd": 0.1,
+    "rgyr": 0.1,
+    "potential": 0.1,
+    "pressure": 0.1,
+}
+
+VERSION = 'v1.0.0'
 
 DESCRIPTION = """
    ____          _ ___ __           ______        
@@ -24,10 +36,56 @@ DESCRIPTION = """
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developers: José D. D. Cediel-Becerra, Jose Cleydson F. Silva and Raquel Dias
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
 Afiliation: Microbiology & Cell Science Deparment, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:"""+VERSION
+
+def equilibrator_elapsed_time(
+        stime: float
+) -> None:
+    """
+    Time used to execute EquilibraTor.
+
+    Args:
+        stime (float): Start time of the process.
+
+    Returns:
+        None
+    """
+    etime = time.time()
+    elapsed_time = etime - stime
+
+    if elapsed_time < 60:
+        time_unit = "seconds"
+        ftime = round(elapsed_time, 2)
+    elif elapsed_time < 3600:
+        time_unit = "minutes"
+        ftime = round(elapsed_time / 60, 2)
+    else:
+        time_unit = "hours"
+        ftime = round(elapsed_time / 3600, 2)
+    logging.info(f"Execution time: {ftime} {time_unit}")
+
+stime = time.time()
+
+class CustomFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None):
+        super().__init__(fmt, datefmt)
+        self.counter = 0
+
+    def format(self, record):
+        self.counter += 1
+        record.custom_counter = f"[{self.counter}]"
+        return super().format(record)
+
+log_format = '%(custom_counter)s - %(asctime)s - %(levelname)s - %(message)s'
+formatter = CustomFormatter(log_format)
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+
 
 def run_equilibrator_steps(pipeline_steps, args):
     first_idx = args.first_step - 1
@@ -37,7 +95,7 @@ def run_equilibrator_steps(pipeline_steps, args):
         raise ValueError("Invalid step range: check --first_step and --last_step")
 
     for i, (name, func) in enumerate(pipeline_steps[first_idx:last_idx], start=first_idx + 1):
-        print(f"[Step {i}] Running: {name}")
+        logging.info(f"{name}")
         func()
 
 def list_equilibrator_steps(pipeline_steps):
@@ -45,66 +103,70 @@ def list_equilibrator_steps(pipeline_steps):
     for i, (name, _) in enumerate(pipeline_steps, 1):
         print(f"{i}: {name}")
 
-
 def run_command(command, cwd=None):
-    #Run a shell command
+    """Run a shell command and return its stdout as a string."""
     try:
-        result = subprocess.run(command, shell=True, cwd=cwd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(result.stdout.decode())
+        result = subprocess.run(
+            command,
+            shell=True,
+            cwd=cwd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True  # ensures result.stdout is already a string
+        )
+        return result.stdout
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e.stderr.decode()}")
+        logging.error(f"Error running command '{command}': {e.stderr}")
         raise
 
+
 def pdb_2_mol2(ligand_file, ligand_mol2):
-    print("\n" + "="*100)
-    print("[INFO]  Converting PDB to MOL2 format for the ligand.")
-    print("="*100)
-    print(f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}")
-    run_command(f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}")
+    """ Convert PDB to MOL for the ligand """
+    command = f"obabel -ipdb -omol2 {ligand_file} -h > {ligand_mol2}"
+    try:
+        run_command(command)
+    except Exception as e:
+        logging.error(f"Failed to convert {ligand_file} to MOL2: {e}")
 
 def generate_topology_ligand(ligand_file, ligand_name, output_dir, atom_type="gaff2", net_charge=0):
-    """Generate ligand topology using ACPYPE."""
-    print("\n" + "="*100)
-    print("[INFO]  Generating topology for the ligand.")
-    print("="*100)
-    command = f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} -a {atom_type} -n {net_charge}"
-    print(command)
-    run_command(command, cwd=output_dir)
+    """Generate ligand topology using ACPYPE """
+    command = (
+        f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} "
+        f"-a {atom_type} -n {net_charge}"
+    )
+    try:
+        run_command(command, cwd=output_dir)
+    except Exception as e:
+        logging.error(
+            f"Failed to generate topology for {ligand_file} (name: {ligand_name}): {e}"
+        )
 
-#def generate_topology_ligand(ligand_file,ligand_name,output_dir):
-    #"""Generate ligand topology using ACPYPE."""
-    #print("\n" + "="*100)
-    #print("[INFO]  Generating topology for the ligand.")
-    #print("="*100)
-    #print(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} -n 0")
-    #run_command(f"acpype -i {ligand_file} -l -o gmx -b {ligand_name} -n 0", cwd=output_dir)
-
+def termini_capping(input_pdb, protein_capped_out, do_capping=False):
+    """
+    Optionally cap protein termini with ACE and NME before topology generation.
+    """
+    if do_capping:
+       cap_protein(input_pdb, protein_capped_out)
+               
 def generate_topology_protein(protein_file, topology_file, protein_gro, output_dir,
                               force_field="amber99sb", water_model="tip3p"):
-    """Generate protein topology using GROMACS."""
-    print("\n" + "="*100)
-    print("[INFO]  Generating topology for the protein.")
-    print("="*100)
+    """Generate protein topology using GROMACS with robust error handling."""
     protein_file = os.path.abspath(protein_file)
     topology_file = os.path.abspath(topology_file)
     protein_gro = os.path.abspath(protein_gro)
     output_dir = os.path.abspath(output_dir)
-    command = f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water {water_model} -ff {force_field} -ignh -p {topology_file}"
-    print(command)
-    run_command(command, cwd=output_dir)
+    command = (
+        f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water {water_model} "
+        f"-ff {force_field} -ignh -p {topology_file}"
+    )
+    try:
+        run_command(command, cwd=output_dir)
+    except Exception as e:
+        logging.error(
+            f"Failed to generate topology for {protein_file}: {e}"
+        )
 
-
-#def generate_topology_protein(protein_file,topology_file,protein_gro,output_dir):
-    #"""Generate protein topology using GROMACS."""
-    #print("\n" + "="*100)
-    #print("[INFO]  Generating topology for the protein.")
-    #print("="*100)
-    #protein_file = os.path.abspath(protein_file)
-    #topology_file = os.path.abspath(topology_file)
-    #protein_gro = os.path.abspath(protein_gro)
-    #print(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}")
-    #run_command(f"gmx pdb2gmx -f {protein_file} -o {protein_gro} -water tip3p -ff amber99sb -ignh -p {topology_file}", cwd=output_dir)
-    
 def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, molecule_names, output_dir, ligands_provided):
     """
     Edits topology files to prepare for merging if ligand files provided.
@@ -116,10 +178,6 @@ def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list,
         molecule_names (list of str): List of molecule names (e.g., ['lig1', 'lig2']).
         ligands_provided (bool): Whether ligand files were provided.
     """
-    print("\n" + "="*100)
-    print("[INFO]  Preparing to merge topologies if ligand(s) provided.")
-    print("="*100)
-
     with open(topology_file, "r") as top_file:
         topology_lines = top_file.readlines()
     
@@ -166,8 +224,6 @@ def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list,
     with open(topology_file, "w") as top_file:
         top_file.writelines(topology_lines)
 
-    print(f"{topology_file} successfully updated")
-
     if ligands_provided:
         for ligand_top in ligand_top_list:
             # Modify ligand top file just like before
@@ -201,16 +257,10 @@ def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list,
             with open(ligand_top, "w") as ligand_top_file:
                 ligand_top_file.writelines(modified_ligand_top)
             
-            print(f"{ligand_top} modified successfully")
-
-
-    
+                
 def merge_topologies(protein_gro, ligand_gro_list, output_gro, ligands_provided):
     """Merge protein and ligand topologies."""
-    print("\n" + "="*100)
-    print("[INFO] Merging topologies for the protein-ligand complex.")
-    print("="*100)
-
+    
     # Read protein gro
     with open(protein_gro, 'r') as f1:
         protein_lines = f1.readlines()
@@ -231,49 +281,44 @@ def merge_topologies(protein_gro, ligand_gro_list, output_gro, ligands_provided)
         out.write(f"{total_atoms}\n")
         out.writelines(merged_body_lines)
         out.write(protein_lines[-1])  # box vectors line
-        
+
 def make_copy_of_protein(input_gro, output_gro):
-    """make copy of protein"""
-    print("\n" + "="*100)
-    print("[INFO]  Making a copy of the protein structure.")
-    print("="*100)
-    run_command(f"gmx editconf -f {input_gro} -o {output_gro}")
-    
+    """Make copy of protein"""
+    command = f"gmx editconf -f {input_gro} -o {output_gro}"
+    try:
+        run_command(command)
+    except Exception as e:
+        logging.error(f"Failed to copy protein from {input_gro} to {output_gro}: {e}")
+
 def create_simulation_box(input_gro, output_gro, box_type="cubic", distance=1.2):
-    """Create a simulation box."""
-    print("\n" + "="*100)
-    print("[INFO] Creating the simulation box.")
-    print("="*100)
-    run_command(f"gmx editconf -f {input_gro} -o {output_gro} -c -d {distance} -bt {box_type}")
+    """Create a simulation box using GROMACS editconf with error handling."""
+    command = f"gmx editconf -f {input_gro} -o {output_gro} -c -d {distance} -bt {box_type}"
+    try:
+        run_command(command)
+    except Exception as e:
+        logging.error(f"Failed to create simulation box for {input_gro}: {e}")
 
 def solvate_system(input_gro, output_gro, topology_file, water_model="tip3p"):
-    """Add water to the system using the appropriate solvent configuration."""
-    print("\n" + "="*100)
-    print(f"[INFO] Solvating the system with {water_model.upper()} water model.")
-    print("="*100)    
-    # Map water models to their corresponding solvent configuration files
+    """Add water to the system using appropriate solvent configuration with error handling."""
     water_config_map = {
         "spc": "spc216.gro",
-        "spce": "spc216.gro",      # SPC/E uses same coordinates as SPC
-        "tip3p": "spc216.gro",     # TIP3P uses 3-point coordinates (same as SPC)
-        "tip4p": "tip4p.gro",      # TIP4P has 4-point structure
-        "tip5p": "tip4p.gro"       # TIP5P not typically available, use tip4p.gro as fallback
+        "spce": "spc216.gro",
+        "tip3p": "spc216.gro",
+        "tip4p": "tip4p.gro",
+        "tip5p": "tip4p.gro"
     }
-    # Get the appropriate configuration file
     solvent_config = water_config_map.get(water_model.lower(), "spc216.gro")
-    
-    # Warn user if using fallback for TIP5P
-    if water_model.lower() == "tip5p":
-        print("[WARNING] TIP5P configuration file not standard in GROMACS.")
-        print("[WARNING] Using tip4p.gro coordinates. Geometry will adjust during equilibration.")
-    run_command(f"gmx solvate -cp {input_gro} -cs {solvent_config} -o {output_gro} -p {topology_file}")
 
-#def solvate_system(input_gro, output_gro, topology_file):
-    #"""Add water to the system."""
-    #print("\n" + "="*100)
-    #print("[INFO] Solvating the system.")
-    #print("="*100)
-    #run_command(f"gmx solvate -cp {input_gro} -cs spc216.gro -o {output_gro} -p {topology_file}")
+    if water_model.lower() == "tip5p":
+        logging.warning("TIP5P configuration file not standard in GROMACS.")
+        logging.warning("Using tip4p.gro coordinates. Geometry will adjust during equilibration.")
+
+    command = f"gmx solvate -cp {input_gro} -cs {solvent_config} -o {output_gro} -p {topology_file}"
+
+    try:
+        run_command(command)
+    except Exception as e:
+        logging.error(f"Failed to solvate system {input_gro} with {water_model}: {e}")
 
 def combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file):
     all_atomtypes = []
@@ -322,101 +367,150 @@ def combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file):
     with open(topology_file, 'w') as f:
         f.writelines(updated_topology)
 
-
 def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir, pos_ion="NA", neg_ion="CL"):
-    """Add user-specified ions to the system."""
-    print("\n" + "="*100)
-    print(f"[INFO] Adding ions: +ion={pos_ion}, -ion={neg_ion}")
-    print("="*100)
+    """Add user-specified ions to the system with robust error handling and logging."""
     grompp = f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}"
-    print(grompp)
-    run_command(grompp, cwd=output_dir)
     genion = f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname {pos_ion} -nname {neg_ion} -neutral"
-    print(genion)
-    run_command(genion, cwd=output_dir)
 
-#def add_ions(mdp_file, input_gro, output_gro, topology_file, ions_tpr, output_dir):
-    #"""Add ions to the system."""
-    #print("\n" + "="*100)
-    #print("[INFO] Adding ions to the system.")
-    #print("="*100)
-    #print (f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}")
-    #run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {ions_tpr}", cwd=output_dir)
-    #print (f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
-    #run_command(f"echo SOL | gmx genion -s {ions_tpr} -o {output_gro} -p {topology_file} -pname NA -nname CL -neutral")
+    try:
+        run_command(grompp, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run grompp for ions preparation: {e}")
+        raise
 
-def minimize_energy(mdp_file, input_gro, output_gro, topology_file,em_tpr,em_edr,potential_xvg, output_dir):
-    """Perform energy minimization."""
-    print("\n" + "="*100)
-    print("[INFO] Performing energy minimization.")
-    print("="*100)
-    run_command(f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {em_tpr}", cwd=output_dir)
-    run_command(f"gmx mdrun -v -deffnm {em_tpr.replace('.tpr','')}")
-    run_command(f"echo '13 0' | gmx energy -f {em_edr} -o {potential_xvg}")
+    try:
+        run_command(genion, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run genion to add ions: {e}")
+        raise
+
+def minimize_energy(mdp_file, input_gro, output_gro, topology_file, em_tpr, em_edr, potential_xvg, output_dir):
+    """Perform energy minimization with robust error handling."""
+    grompp_cmd = f"gmx grompp -f {mdp_file} -c {input_gro} -p {topology_file} -o {em_tpr}"
+    mdrun_cmd = f"gmx mdrun -v -deffnm {em_tpr.replace('.tpr', '')}"
+    energy_cmd = f"echo '13 0' | gmx energy -f {em_edr} -o {potential_xvg}"
+
+    try:
+        run_command(grompp_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed grompp step during energy minimization: {e}")
+        raise
+
+    try:
+        run_command(mdrun_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed mdrun step during energy minimization: {e}")
+        raise
+
+    try:
+        run_command(energy_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed energy extraction step during energy minimization: {e}")
+        raise
 
 def plot_energy_results(xvg_file, output_pdf):
-    """Generate plots from .xvg files."""
-    print("\n" + "="*100)
-    print("[INFO] Generating energy minimization plots.")
-    print("="*100)
-    data = np.loadtxt(xvg_file, comments=['@', '#'])
-    plt.plot(data[:, 0], data[:, 1])
-    plt.xlabel('Time (ps)')
-    plt.ylabel('Potential Energy (kJ/mol)')
-    plt.title('Potential Energy vs Time')
-    plt.savefig(output_pdf)
+    """Generate plots from .xvg files with error handling."""
+    try:
+        data = np.loadtxt(xvg_file, comments=['@', '#'])
+    except Exception as e:
+        logging.error(f"Failed to load data from {xvg_file}: {e}")
+        return
+
+    try:
+        plt.figure()
+        plt.plot(data[:, 0], data[:, 1])
+        plt.xlabel('Time (ps)')
+        plt.ylabel('Potential Energy (kJ/mol)')
+        plt.title('Potential Energy vs Time')
+        plt.savefig(output_pdf)
+        plt.close()
+    except Exception as e:
+        logging.error(f"Failed to plot and save energy results to {output_pdf}: {e}")
 
 def get_potential_backbone_pressure_xvgs(em_edr, em_tpr, potential_xvg, rmsf_xvg, pressure_xvg, em_trr):
-    print("\n" + "="*100)
-    print("[INFO] Running GROMACS to calculate potential energy, RMSF for the backbone, and pressure")
-    print("="*100)
-    run_command(f"echo 'Potential' | gmx energy -f {em_edr} -o {potential_xvg}")
-    run_command(f"echo 'Backbone' | gmx rmsf -s {em_tpr} -f {em_trr} -o {rmsf_xvg}")
-    run_command(f"echo 'Pressure' | gmx energy -f {em_edr} -o {pressure_xvg}")
+    """Extract potential energy, backbone RMSF, and pressure data to XVG files with error handling."""
+    cmd_potential = f"echo 'Potential' | gmx energy -f {em_edr} -o {potential_xvg}"
+    cmd_rmsf = f"echo 'Backbone' | gmx rmsf -s {em_tpr} -f {em_trr} -o {rmsf_xvg}"
+    cmd_pressure = f"echo 'Pressure' | gmx energy -f {em_edr} -o {pressure_xvg}"
 
-def plot_em_results(potential_xvg,pressure_xvg,rmsf_xvg,energy_minimization_results):
-    # Load data from .xvg files
-    print("\n" + "="*100)
-    print("[INFO] Plotting energy minimization results for publication.")
-    print("="*100)
-    potential = np.loadtxt(potential_xvg, comments=['#', '@'])
-    rmsf = np.loadtxt(rmsf_xvg, comments=['#', '@'])
-    pressure = np.loadtxt(pressure_xvg, comments=['#', '@'])
+    try:
+        run_command(cmd_potential)
+    except Exception as e:
+        logging.error(f"Failed to extract potential energy to {potential_xvg}: {e}")
+        raise
 
-    # Create plot panel
-    fig, axs = plt.subplots(1, 3, figsize=(20, 6), sharex=False)
+    try:
+        run_command(cmd_rmsf)
+    except Exception as e:
+        logging.error(f"Failed to extract backbone RMSF to {rmsf_xvg}: {e}")
+        raise
 
-    # Potential Energy
-    axs[0].plot(potential[:, 0], potential[:, 1])
-    axs[0].set_ylabel('Potential Energy\n(kJ/mol)')
-    axs[0].set_xlabel('Time (ps)')
+    try:
+        run_command(cmd_pressure)
+    except Exception as e:
+        logging.error(f"Failed to extract pressure to {pressure_xvg}: {e}")
+        raise
 
-    # Pressure
-    axs[1].plot(pressure[:, 0], pressure[:, 1])
-    axs[1].set_ylabel('Pressure (bar)')
-    axs[1].set_xlabel('Time (ps)')
+def plot_em_results(potential_xvg, pressure_xvg, rmsf_xvg, energy_minimization_results):
+    """Generate combined energy minimization result plots with error handling."""
+    try:
+        potential = np.loadtxt(potential_xvg, comments=['#', '@'])
+    except Exception as e:
+        logging.error(f"Failed to load potential energy data from {potential_xvg}: {e}")
+        return
 
-    # RMSF                                                                                                                                                                                             
-    axs[2].plot(rmsf[:, 0], rmsf[:, 1])
-    axs[2].set_ylabel('RMSF (nm)')
-    axs[2].set_xlabel('Atom')
+    try:
+        pressure = np.loadtxt(pressure_xvg, comments=['#', '@'])
+    except Exception as e:
+        logging.error(f"Failed to load pressure data from {pressure_xvg}: {e}")
+        return
 
-    plt.tight_layout()
-    plt.savefig(energy_minimization_results, format='pdf', dpi=300)
-    
+    try:
+        rmsf = np.loadtxt(rmsf_xvg, comments=['#', '@'])
+    except Exception as e:
+        logging.error(f"Failed to load RMSF data from {rmsf_xvg}: {e}")
+        return
+
+    try:
+        fig, axs = plt.subplots(1, 3, figsize=(20, 6), sharex=False)
+
+        axs[0].plot(potential[:, 0], potential[:, 1])
+        axs[0].set_ylabel('Potential Energy\n(kJ/mol)')
+        axs[0].set_xlabel('Time (ps)')
+
+        axs[1].plot(pressure[:, 0], pressure[:, 1])
+        axs[1].set_ylabel('Pressure (bar)')
+        axs[1].set_xlabel('Time (ps)')
+
+        axs[2].plot(rmsf[:, 0], rmsf[:, 1])
+        axs[2].set_ylabel('RMSF (nm)')
+        axs[2].set_xlabel('Atom')
+
+        plt.tight_layout()
+        plt.savefig(energy_minimization_results, format='pdf', dpi=600)
+        plt.close()
+    except Exception as e:
+        logging.error(f"Failed to plot or save energy minimization results to {energy_minimization_results}: {e}")
+
 def get_final_minimized_structure(em_tpr, em_trr, final_minimized):
-    print("\n" + "="*100)
-    print("[INFO]  Generating final minimized structure.")
-    print("="*100)
-    run_command(f"echo 'non-Water' | gmx trjconv -s {em_tpr} -f {em_trr} -o {final_minimized} -pbc nojump")
+    """Extract final minimized structure with error handling."""
+    command = f"echo 'non-Water' | gmx trjconv -s {em_tpr} -f {em_trr} -o {final_minimized} -pbc nojump"
+    try:
+        run_command(command)
+    except Exception as e:
+        logging.error(f"Failed to extract final minimized structure to {final_minimized}: {e}")
 
 def load_xvg(filename):
-    """Load data from an XVG file, ignoring comments."""
-    return np.loadtxt(filename, comments=['#', '@'])
+    """Load numerical data from an XVG file, ignoring comment lines starting with @ or #."""
+    try:
+        data = np.loadtxt(filename, comments=['#', '@'])
+        return data
+    except Exception as e:
+        logging.error(f"Failed to load XVG file {filename}: {e}")
+        return None
 
-def plot_eq(eq_potential,eq_pressure_xvg,eq_temperature_xvg,eq_rmsd_xvg,eq_rmsf_xvg,eq_gyrate_xvg,equilibration_analysis):
-    
-    # Load data from XVG files
+def plot_eq(eq_potential, eq_pressure_xvg, eq_temperature_xvg, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, equilibration_analysis):
+    """Generate a 3x2 panel plot of equilibration analysis with error handling."""
     potential = load_xvg(eq_potential)
     pressure = load_xvg(eq_pressure_xvg)
     temperature = load_xvg(eq_temperature_xvg)
@@ -424,48 +518,50 @@ def plot_eq(eq_potential,eq_pressure_xvg,eq_temperature_xvg,eq_rmsd_xvg,eq_rmsf_
     rmsf = load_xvg(eq_rmsf_xvg)
     gyrate = load_xvg(eq_gyrate_xvg)
 
-    # Create a 3x2 panel of plots
-    fig, axs = plt.subplots(3, 2, figsize=(12, 15))
-    fig.suptitle('Equilibration MD Analysis', fontsize=16)
+    # Check all data loaded correctly before plotting
+    data_list = [potential, pressure, temperature, rmsd, rmsf, gyrate]
+    if any(d is None for d in data_list):
+        logging.error("One or more XVG files could not be loaded, skipping plotting.")
+        return
 
-    # Plot Potential Energy
-    axs[0, 0].plot(potential[:, 0], potential[:, 1], label='Potential Energy', color='b')
-    axs[0, 0].set_ylabel('Energy (kJ/mol)')
-    axs[0, 0].set_xlabel('Time (ps)')
-    axs[0, 0].legend()
+    try:
+        fig, axs = plt.subplots(3, 2, figsize=(12, 15))
 
-    # Plot Pressure
-    axs[0, 1].plot(pressure[:, 0], pressure[:, 1], label='Pressure', color='g')
-    axs[0, 1].set_ylabel('Pressure (bar)')
-    axs[0, 1].set_xlabel('Time (ps)')
-    axs[0, 1].legend()
+        axs[0, 0].plot(potential[:, 0], potential[:, 1], label='Potential Energy', color='b')
+        axs[0, 0].set_ylabel('Energy (kJ/mol)')
+        axs[0, 0].set_xlabel('Time (ps)')
+        axs[0, 0].legend()
 
-    # Plot Temperature
-    axs[1, 0].plot(temperature[:, 0], temperature[:, 1], label='Temperature', color='r')
-    axs[1, 0].set_ylabel('Temperature (K)')
-    axs[1, 0].set_xlabel('Time (ps)')
-    axs[1, 0].legend()
+        axs[0, 1].plot(pressure[:, 0], pressure[:, 1], label='Pressure', color='g')
+        axs[0, 1].set_ylabel('Pressure (bar)')
+        axs[0, 1].set_xlabel('Time (ps)')
+        axs[0, 1].legend()
 
-    # Plot RMSD
-    axs[1, 1].plot(rmsd[:, 0], rmsd[:, 1], label='RMSD', color='c')
-    axs[1, 1].set_ylabel('RMSD (nm)')
-    axs[1, 1].set_xlabel('Time (ps)')
-    axs[1, 1].legend()
+        axs[1, 0].plot(temperature[:, 0], temperature[:, 1], label='Temperature', color='r')
+        axs[1, 0].set_ylabel('Temperature (K)')
+        axs[1, 0].set_xlabel('Time (ps)')
+        axs[1, 0].legend()
 
-    # Plot RMSF
-    axs[2, 0].plot(rmsf[:, 0], rmsf[:, 1], label='RMSF', color='m')
-    axs[2, 0].set_ylabel('RMSF (nm)')
-    axs[2, 0].set_xlabel('Atom')
-    axs[2, 0].legend()
+        axs[1, 1].plot(rmsd[:, 0], rmsd[:, 1], label='RMSD', color='c')
+        axs[1, 1].set_ylabel('RMSD (nm)')
+        axs[1, 1].set_xlabel('Time (ps)')
+        axs[1, 1].legend()
 
-    # Plot Radius of Gyration
-    axs[2, 1].plot(gyrate[:, 0], gyrate[:, 1], label='Radius of Gyration', color='y')
-    axs[2, 1].set_ylabel('Rg (nm)')
-    axs[2, 1].set_xlabel('Time (ps)')
-    axs[2, 1].legend()
+        axs[2, 0].plot(rmsf[:, 0], rmsf[:, 1], label='RMSF', color='m')
+        axs[2, 0].set_ylabel('RMSF (nm)')
+        axs[2, 0].set_xlabel('Atom')
+        axs[2, 0].legend()
 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95]) 
-    plt.savefig(equilibration_analysis, format='pdf', dpi=300)
+        axs[2, 1].plot(gyrate[:, 0], gyrate[:, 1], label='Radius of Gyration', color='y')
+        axs[2, 1].set_ylabel('Rg (nm)')
+        axs[2, 1].set_xlabel('Time (ps)')
+        axs[2, 1].legend()
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.savefig(equilibration_analysis, format='pdf', dpi=600)
+        plt.close()
+    except Exception as e:
+        logging.error(f"Failed to generate equilibration plots saved at {equilibration_analysis}: {e}")
 
 def get_last_frame_time(trr_file):
     """Extract the time of the last frame from the trajectory using `gmx check`."""
@@ -484,97 +580,510 @@ def get_last_frame_time(trr_file):
         raise RuntimeError("Could not determine last frame time from trajectory.")
 
 def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
-                                   final_last_equilibrated_pdb, final_equilibrated_gro, final_equilibrated_pdb, group1="non-Water", group2="System"): 
-    """Extract the last frame from a trajectory and also output a nojump .gro trajectory."""
-    last_frame_time = get_last_frame_time(equilibration_trr)        
+                                  final_last_equilibrated_pdb, final_equilibrated_gro, final_equilibrated_pdb,
+                                  group1="non-Water", group2="System"):
+    """Extract the last frame and produce nojump trajectories, robustly."""
+    last_frame_time = get_last_frame_time(equilibration_trr)
+
     get_last_frame = (
         f"echo '{group1}' | gmx trjconv -s {equilibration_tpr} -f {equilibration_trr} "
         f"-o {final_last_equilibrated_pdb} -dump {last_frame_time}"
     )
-    run_command(get_last_frame)
+
     get_movie_pdb = (
         f"echo '{group1}' | gmx trjconv -s {equilibration_tpr} -f {equilibration_trr} "
         f"-o {final_equilibrated_pdb} -pbc nojump"
     )
-    run_command(get_movie_pdb)
+
     get_movie_gro = (
         f"echo '{group2}' | gmx trjconv -s {equilibration_tpr} -f {equilibration_trr} "
-	f"-o {final_equilibrated_gro} -pbc nojump"
+        f"-o {final_equilibrated_gro} -pbc nojump"
     )
-    run_command(get_movie_gro)
-    
-    
-def make_refinement(topology_file, equilibration_tpr, em_gro, output_dir):
-    print("\n" + "="*100)
-    print("[INFO] Starting refinement (equilibrium) process.")
-    print("="*100)
 
-    print("\n" + "*"*100)
-    print("[INFO] 1) Preparing input files for equilibration: Running `gmx grompp`...")
-    print("\n" + "*"*100)
-    run_command(f"gmx grompp -f {EQUILIBRATION_MDP} -c {em_gro} -p {topology_file} -o {equilibration_tpr}", cwd=output_dir)
-    
-    print("\n" + "*"*100)
-    print("[RUNNING] 2) Equilibration simulation: Running `gmx mdrun`...")
-    print("\n" + "*"*100)
-    run_command(f"gmx mdrun -s {equilibration_tpr} -deffnm {equilibration_tpr.replace('.tpr','')}")
+    try:
+        run_command(get_last_frame)
+    except Exception as e:
+        logging.error(f"Failed to extract last frame to {final_last_equilibrated_pdb}: {e}")
+        raise
 
-def get_refinement_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro):
-    print("\n" + "*"*100)
-    print("[INFO] 1) Extracting potential energy from equilibration results...")
-    print("\n" + "*"*100)
-    run_command(f"echo 'Potential' | gmx energy -f {equilibration_edr} -o {eq_potential_xvg}")
+    try:
+        run_command(get_movie_pdb)
+    except Exception as e:
+        logging.error(f"Failed to generate nojump PDB trajectory to {final_equilibrated_pdb}: {e}")
+        raise
+
+    try:
+        run_command(get_movie_gro)
+    except Exception as e:
+        logging.error(f"Failed to generate nojump GRO trajectory to {final_equilibrated_gro}: {e}")
+        raise
+
+def run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir):
+    """Run NVT equilibration with robust error handling."""
+    grompp_cmd = f"gmx grompp -f {NVT_MDP} -c {em_gro} -r {em_gro} -p {topology_file} -o {equilibration_tpr}"
+    mdrun_cmd = f"gmx mdrun -s {equilibration_tpr} -deffnm {equilibration_tpr.replace('.tpr','')}"
+
+    try:
+        run_command(grompp_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run grompp for NVT equilibration: {e}")
+        raise
+
+    try:
+        run_command(mdrun_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run mdrun for NVT equilibration: {e}")
+        raise
+
+def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg,
+                             equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg,
+                             final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro):
+    commands = [
+        (f"echo 'Potential' | gmx energy -f {equilibration_edr} -o {eq_potential_xvg}", "Extract potential energy"),
+        (f"echo 'Pressure' | gmx energy -f {equilibration_edr} -o {eq_pressure_xvg}", "Extract pressure"),
+        (f"echo 'Temperature' | gmx energy -f {equilibration_edr} -o {eq_temperature_xvg}", "Extract temperature"),
+        (f"echo 'Backbone Backbone' | gmx rms -s {equilibration_tpr} -f {equilibration_trr} -o {eq_rmsd_xvg}", "Calculate RMSD"),
+        (f"echo 'Backbone' | gmx rmsf -s {equilibration_tpr} -f {equilibration_trr} -o {eq_rmsf_xvg}", "Calculate RMSF"),
+        (f"echo 'Protein' | gmx gyrate -s {equilibration_tpr} -f {equilibration_trr} -o {eq_gyrate_xvg}", "Calculate radius of gyration")
+    ]
+
+    for cmd, description in commands:
+        try:
+            run_command(cmd)
+        except Exception as e:
+            logging.error(f"Failed to {description}: {e}")
+            raise
+
+    try:
+        extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
+                                     final_last_equilibrated_pdb, final_equilibrated_gro, final_equilibrated_pdb)
+    except Exception as e:
+        logging.error(f"Failed in extract_last_frame_and_unwrap: {e}")
+        raise
+
+    try:
+        plot_eq(eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, equilibration_analysis)
+    except Exception as e:
+        logging.error(f"Failed to plot equilibration analysis: {e}")
+        raise
+
+def run_NPT_equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb, output_dir):
+    """Run NPT equilibration with robust error handling."""
+    grompp_cmd = f"gmx grompp -f {NPT_MDP} -c {nvt_gro} -r {nvt_gro} -p {topology_file} -o {npt_tpr}"
+    mdrun_cmd = f"gmx mdrun -s {npt_tpr} -deffnm {npt_tpr.replace('.tpr','')}"
+
+    try:
+        run_command(grompp_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run grompp for NPT equilibration: {e}")
+        raise
+
+    try:
+        run_command(mdrun_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run mdrun for NPT equilibration: {e}")
+        raise
+
+def run_production_stage(topology_file, production_tpr, npt_gro, output_dir):
+    """Run production MD stage with robust error handling."""
+    grompp_cmd = f"gmx grompp -f {PRODUCTION_MDP} -c {npt_gro} -p {topology_file} -o {production_tpr}"
+    mdrun_cmd = f"gmx mdrun -s {production_tpr} -deffnm {production_tpr.replace('.tpr','')}"
+
+    try:
+        run_command(grompp_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run grompp for production stage: {e}")
+        raise
+
+    try:
+        run_command(mdrun_cmd, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to run mdrun for production stage: {e}")
+        raise
+
+def analyze_blocks(xvg_file, block_size, overlap, total_time, output_dir):
+    """Perform block averaging using gmx analyze and return list of (start, end, avg, std)."""
+    blocks = []
+    start = 0
+    results = []
+
+    while start < total_time:
+        end = min(start + block_size, total_time)
+        blocks.append((start, end))
+        start += (block_size - overlap)
+
+    for b_start, b_end in blocks:
+        cmd = f"gmx analyze -f {xvg_file} -b {b_start} -e {b_end}"
+        logging.debug(f"Running block analysis: {cmd}")
+        output = run_command(cmd, cwd=output_dir)
+        avg, std = None, None
+        for line in output.splitlines():
+            if line.strip().startswith("SS1"):
+                columns = line.split()
+                avg = float(columns[1])
+                std = float(columns[2])
+        results.append((b_start, b_end, avg, std))
+        logging.debug(f"Block {b_start}-{b_end}: avg={avg}, std={std}")
+
+    # Write block-averaged data to a file
+    block_file = xvg_file.replace(".xvg", "_blocks.xvg")
+    with open(block_file, "w") as f:
+        f.write("# BlockStart BlockEnd Average Stddev\n")
+        for b in results:
+            f.write(f"{b[0]} {b[1]} {b[2]} {b[3]}\n")
+
+    return results, block_file
+
+def parse_observable_values(
+    arg_list,
+    default_dict=None,
+    value_type=float,
+    allowed_keys=None,
+    req_all_obs=False
+):
+    """
+    Parse CLI list of 'observable=value' strings into a dictionary.
+    Behavior:
+      - If no observables are given → only use RMSD.
+      - If observables are given → use only those.
+      - If observables are given + --req_all_obs → add missing ones with defaults.
+    """
+    thresholds = {}
+    if default_dict is None:
+        default_dict = {}
+
+    allowed_keys = set(default_dict.keys()) if allowed_keys is None else set(allowed_keys)
+
+    # arse user-provided observables ---
+    if arg_list:
+        for item in arg_list:
+            if "=" not in item:
+                raise ValueError(f"Invalid observable threshold format: '{item}' (expected obs=value)")
+            key, val = item.split("=", 1)
+            key = key.strip()
+            if key not in allowed_keys:
+                raise ValueError(f"Unknown observable '{key}'. Allowed: {', '.join(allowed_keys)}")
+            try:
+                val = value_type(val.strip())
+            except ValueError:
+                raise ValueError(f"Threshold value for '{key}' must be a number, got '{val}'")
+            thresholds[key] = val
+
+    #andle flag: require all observables ---
+    if req_all_obs:
+        # Fill in missing ones with defaults
+        for k, v in default_dict.items():
+            if k not in thresholds:
+                thresholds[k] = v
+
+    #f nothing provided at all ---
+    if not arg_list and not thresholds:
+        if "rmsd" in default_dict:
+            thresholds = {"rmsd": default_dict["rmsd"]}
+        else:
+            raise ValueError("Default dictionary must include RMSD threshold if no input is provided.")
+
+    return thresholds
+
+def extract_trajectory_segment(clustering_anl, tpr_file, trr_file, output_trr, start_time=0, end_time=None):
+    cmd = f"gmx trjconv -s {tpr_file} -f {trr_file} -o {output_trr} -b {start_time}"
+    if end_time is not None:
+        cmd += f" -e {end_time}"
+    logging.info(f"Extracting trajectory segment from {start_time} ps to the end of the simulation")
+    run_command(f"echo 'System' | {cmd}", cwd=clustering_anl)
+    return output_trr
     
-    print("\n" + "*"*100)
-    print("[INFO] 2) Extracting pressure data from equilibration results...")
-    print("\n" + "*"*100)
-    run_command(f"echo 'Pressure' | gmx energy -f {equilibration_edr} -o {eq_pressure_xvg}")
+def cluster_equilibrated_trajectory(output_dir, tpr_file, equil_trr, output_pdb, cutoff=0.1, group="non-Water non-Water"):
+    cmd = f"echo '{group}' | gmx cluster -s {tpr_file} -f {equil_trr} -method gromos -cutoff {cutoff} -cl {output_pdb}"
+    logging.info(f"Clustering equilibrated trajectory with a RMSD cutoff value of {cutoff}")
+    run_command(cmd, cwd=output_dir)
+    logging.info(f"Representative structure saved at: {output_pdb}")
+    return output_pdb
+
+def write_equilibration_report(
+    total_time,
+    clustering_anl,
+    equil_info_file,
+    equil_times,
+    thresholds_dict,
+    block_files_dict,
+    xvg_files,
+    equil_start,
+    equil_end,
+    require_all_observables=True,
+    block_size=100,
+    overlap=0
+):
+    equil_info_path = os.path.join(clustering_anl, equil_info_file)
+    with open(equil_info_path, "w") as f:
+        f.write("EQUILIBRATION ANALYSIS REPORT\n")
+        f.write("="*60 + "\n\n")
+        f.write(f"Analysis mode: {'ALL observables' if require_all_observables else f'Single observable ({os.path.basename(list(equil_times.keys())[0])})'}\n")
+        f.write(f"Block size: {block_size} ps\n")
+        f.write(f"Block overlap: {overlap} ps\n")
+        f.write(f"Total simulation time: {total_time} ps\n\n")
+
+        f.write("EQUILIBRATION TIMES BY OBSERVABLE:\n")
+        f.write("-"*60 + "\n")
+        for obs, time in sorted(equil_times.items(), key=lambda x: x[1]):
+            obs_basename = os.path.basename(obs)
+            obs_threshold = thresholds_dict.get(obs, 0.02)
+            f.write(f"  {obs_basename:40s} {time:8.1f} ps (threshold={obs_threshold})\n")
+
+        if not require_all_observables:
+            f.write("\nOTHER OBSERVABLES (analyzed but not used for equilibration):\n")
+            f.write("-"*60 + "\n")
+            for obs in xvg_files:
+                if obs not in equil_times:
+                    obs_basename = os.path.basename(obs)
+                    f.write(f"  {obs_basename:40s} [not used]\n")
+
+        f.write("\n" + "-"*60 + "\n")
+        f.write(f"FINAL EQUILIBRATION START: {equil_start:.1f} ps\n")
+        f.write(f"EQUILIBRATED SEGMENT: {equil_start:.1f} - {equil_end:.1f} ps\n")
+        f.write(f"EQUILIBRATED LENGTH: {equil_end - equil_start:.1f} ps\n")
+        f.write("-"*60 + "\n\n")
+
+        f.write("BLOCK-AVERAGED FILES:\n")
+        for obs, blk_file in block_files_dict.items():
+            f.write(f"  {os.path.basename(obs)}: {blk_file}\n")
+
+    logging.info(f"Equilibration report written to: {equil_info_file}")
+
+def get_total_simulation_time(xvg_file):
+    """
+    Determine total simulation time from a single XVG file.
+
+    Parameters
+    ----------
+    xvg_file : str
+        Path to XVG file with at least two columns (time, value)
+
+    Returns
+    -------
+    total_time : float
+        Maximum simulation time (ps)
+    """
+    try:
+        data = np.loadtxt(xvg_file, comments=("#", "@"))
+    except Exception as e:
+        raise ValueError(f"Failed to read XVG file '{xvg_file}': {e}")
+
+    if data.size == 0:
+        raise ValueError(f"No data found in XVG file '{xvg_file}'")
+
+    # Handle single-row files
+    if data.ndim == 1:
+        return float(data[0])
+    else:
+        return float(np.max(data[:, 0]))
+
+def check_equilibration_slope_drift(block_results, 
+                                    window_size_blocks, 
+                                    tolerance_value, 
+                                    tolerance_type="relative"):
+    """
+    Checks for equilibration by finding the first window of blocks where the
+    slope of the averages is acceptably flat (i.e., not drifting).
+    """
     
-    print("\n" + "*"*100)
-    print("[INFO] 3) Extracting temperature data from equilibration results...")
-    print("\n" + "*"*100)
-    run_command(f"echo 'Temperature' | gmx energy -f {equilibration_edr} -o {eq_temperature_xvg}")
+    valid_results = [r for r in block_results if r[2] is not None and r[3] is not None]
     
-    print("\n" + "*"*100)
-    print("[INFO] 4) Calculating RMSD for the backbone from equilibration trajectory...")
-    print("\n" + "*"*100)
-    run_command(f"echo 'Backbone Backbone' | gmx rms -s {equilibration_tpr} -f {equilibration_trr} -o {eq_rmsd_xvg}")
+    if len(valid_results) < window_size_blocks:
+        logging.warning(f"Not enough valid blocks ({len(valid_results)}) for slope analysis "
+                        f"with window size {window_size_blocks}.")
+        return block_results[0][0] # Returns start time of first block
     
-    print("\n" + "*"*100)
-    print("[INFO] 5) Calculating RMSF for the backbone from equilibration trajectory...")
-    print("\n" + "*"*100)
-    run_command(f"echo 'Backbone' | gmx rmsf -s {equilibration_tpr} -f {equilibration_trr} -o {eq_rmsf_xvg}")
+    times = np.array([r[0] for r in valid_results])
+    averages = np.array([r[2] for r in valid_results])
+    last_block_end = block_results[-1][1]
+
+    # Define the "flatness" drift threshold
+    if tolerance_type == "absolute":
+        drift_threshold = tolerance_value
+        logging.debug(f"Checking: Using ABSOLUTE drift threshold = {drift_threshold:.4f}")
     
-    print("\n" + "*"*100)
-    print("[INFO] 6) Calculating radius of gyration for the protein...")
-    print("\n" + "*"*100)
-    run_command(f"echo 'Protein' | gmx gyrate -s {equilibration_tpr} -f {equilibration_trr} -o {eq_gyrate_xvg}")
+    elif tolerance_type == "relative":
+        last_half_start_index = len(averages) // 2
+        final_std = np.std(averages[last_half_start_index:])
+        
+        if final_std == 0:
+            logging.warning("Std dev of final half is zero. Cannot use relative tolerance; defaulting to 1e-6 absolute.")
+            drift_threshold = 1e-6
+        else:
+            drift_threshold = final_std * tolerance_value
+            logging.debug(f"Checking: Ref noise (std of last half) = {final_std:.4f}")
+            logging.debug(f"Checking: Using RELATIVE drift threshold = {drift_threshold:.4f}")
     
-    print("\n" + "*"*100)
-    print("[INFO] 7)Extracting last frame and unwrapping trajectory...")
-    print("\n" + "*"*100)
-    extract_last_frame_and_unwrap(equilibration_tpr,equilibration_trr,final_last_equilibrated_pdb,final_equilibrated_gro, final_equilibrated_pdb) 
-    
-    print("\n" + "*"*100)
-    print("[INFO] 8) Plotting equilibration analysis results...")
-    print("\n" + "*"*100)
-    plot_eq(eq_potential_xvg,eq_pressure_xvg,eq_temperature_xvg,eq_rmsd_xvg,eq_rmsf_xvg,eq_gyrate_xvg,equilibration_analysis)
+    else:
+        raise ValueError(f"Unknown tolerance_type: {tolerance_type}. Must be 'absolute' or 'relative'.")
 
 
-def Run_NPT_Equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb, output_dir):
-    print("\n" + "="*100)
-    print("[INFO] Starting additional refinement (equilibrium NPT) process.")
-    print("="*100)
+    # Slide a window across the data and check the slope
+    for i in range(len(averages) - window_size_blocks + 1):
+        
+        t_window = times[i : i + window_size_blocks]
+        avg_window = averages[i : i + window_size_blocks]
 
-    print("\n" + "*"*100)
-    print("[INFO] 1) Preparing input files for NPT equilibration: Running `gmx grompp`...")
-    print("\n" + "*"*100)
-    run_command(f"gmx grompp -f {EQUILIBRATION_2_MDP} -c {nvt_gro} -p {topology_file} -o {npt_tpr}", cwd=output_dir)
+        # Fit a line (degree 1 polynomial) to the window and get the slope
+        slope = np.polyfit(t_window, avg_window, 1)[0]
 
-    print("\n" + "*"*100)
-    print("[RUNNING] 2) NPT Equilibration simulation: Running `gmx mdrun`...")
-    print("\n" + "*"*100)
-    run_command(f"gmx mdrun -s {npt_tpr} -deffnm {npt_tpr.replace('.tpr','')}")
+        # Calculate the total drift (change) across the window
+        window_duration = t_window[-1] - t_window[0]
+        drift = abs(slope * window_duration)
+        
+        # Make the decision
+        if drift < drift_threshold:
+            equilibration_time = t_window[0]
+            logging.info(f"Equilibration detected at t = {equilibration_time} ps (Slope/Drift method) with relative threshold of {tolerance_value}")
+            return equilibration_time
+
+    logging.warning("No stable equilibration point found using Slope/Drift method.")
+    return last_block_end 
+
+def check_equilibration_multi_observable(
+    block_results_dict,
+    thresholds_dict,
+    method="slope_drift",  # Defaulting to the implemented method
+    window_size_blocks=5,
+    tolerance_type="relative",
+    req_all_obs=False
+):
+    equil_times = {}
+    non_equilibrated = []
+
+    for obs_name, block_results in block_results_dict.items():
+        if obs_name not in thresholds_dict:
+            logging.warning(f"No threshold for {obs_name}, skipping.")
+            continue
+
+        obs_threshold = thresholds_dict[obs_name]
+
+        # Only calling the implemented slope_drift method
+        if method == "slope_drift":
+            equil_time = check_equilibration_slope_drift(
+                block_results,
+                window_size_blocks=window_size_blocks,
+                tolerance_value=obs_threshold,
+                tolerance_type=tolerance_type,
+            )
+        else:
+             # This 'else' handles the case where the user specifies an unsupported method
+             logging.error(f"Unsupported equilibration method '{method}'. Only 'slope_drift' is implemented.")
+             sys.exit(1)
+            
+        equil_times[obs_name] = equil_time
+        logging.info(f"{obs_name}: equilibration at {equil_time} ps (method={method})")
+
+        last_block_end = block_results[-1][1]
+        if equil_time >= last_block_end:
+            non_equilibrated.append(obs_name)
+
+    if non_equilibrated:
+        logging.warning(f"Not equilibrated: {', '.join(non_equilibrated)}")
+        #sys.exit(1) 
+    
+    if not equil_times:
+         return 0, {}
+
+    equil_start = max(equil_times.values())
+    return equil_start, equil_times
+
+
+def get_convergence_clustering(
+    output_dir,
+    clustering_anl,
+    tpr_file,
+    trr_file,
+    obs_xvg_dict,
+    block_size=100,
+    overlap=0,
+    thresholds=None,
+    default_thresholds=None,
+    method='slope_drift', # Changed default to the implemented method
+    window_size_blocks=5,
+    tolerance_type="relative",
+    cluster_cutoff=0.1,
+    cluster_group="non-Water non-Water",
+    req_all_obs=False
+):
+
+    os.makedirs(clustering_anl, exist_ok=True)
+    # Parse thresholds (assuming parse_observable_values is available)
+    thresholds_dict = parse_observable_values(
+        thresholds,
+        default_dict=default_thresholds,
+        allowed_keys=obs_xvg_dict.keys(),
+        req_all_obs=req_all_obs
+    )
+    logging.info(f"Observables thresholds requested: {thresholds_dict}")
+    # Decide which observables to analyze
+    if req_all_obs:
+        obs_to_analyze = list(obs_xvg_dict.keys())
+    else:
+        obs_to_analyze = list(thresholds_dict.keys())
+        
+    if not obs_to_analyze:
+        logging.error("No observables selected for analysis.")
+        return 0, {}
+
+    block_results_dict = {}
+    block_files_dict = {}
+    for obs in obs_to_analyze:
+        xvg = obs_xvg_dict[obs]
+        logging.debug(f"Analyzing {obs} ({xvg})...")
+        total_time = get_total_simulation_time(xvg)
+        results, block_file = analyze_blocks(xvg, block_size, overlap, total_time, output_dir)
+        block_results_dict[obs] = results
+        block_files_dict[obs] = block_file
+
+    # All paths now funnel into the slope_drift logic
+    if len(obs_to_analyze) > 1:
+        equil_start, equil_times = check_equilibration_multi_observable(
+            block_results_dict,
+            thresholds_dict,
+            method=method,
+            window_size_blocks=window_size_blocks,
+            tolerance_type=tolerance_type,
+            req_all_obs=req_all_obs
+        )
+    else:
+        # Case: Only one observable to analyze
+        obs = obs_to_analyze[0]
+        obs_threshold = thresholds_dict[obs] 
+        if method == "slope_drift":
+             equil_start = check_equilibration_slope_drift(
+                block_results_dict[obs],
+                window_size_blocks=window_size_blocks,
+                tolerance_value=obs_threshold,
+                tolerance_type=tolerance_type,
+            )
+        else:
+            logging.error(f"Unsupported equilibration method '{method}'. Only 'slope_drift' is implemented.")
+            sys.exit(1)
+        equil_times = {obs: equil_start}
+
+    write_equilibration_report(
+	total_time,
+	clustering_anl,
+    	equil_info_file="convergence_report.txt",
+    	equil_times=equil_times,
+    	thresholds_dict=thresholds_dict,
+    	block_files_dict=block_files_dict,
+    	xvg_files=obs_xvg_dict.values(),
+    	equil_start=equil_start,
+    	equil_end=total_time,
+    	require_all_observables=req_all_obs,
+    	block_size=block_size,
+    	overlap=overlap
+    )
+
+    # Step 4 & 5: extract trajectory & cluster (assuming these functions are available)
+    equil_trr = os.path.join(clustering_anl, "equil_traj.trr")
+    extract_trajectory_segment(clustering_anl, tpr_file, trr_file, equil_trr, start_time=equil_start, end_time=None)
+    rep_pdb = os.path.join(clustering_anl, "rep_structure.pdb")
+    cluster_equilibrated_trajectory(clustering_anl, tpr_file, equil_trr, rep_pdb, cutoff=cluster_cutoff, group=cluster_group)
+    
 
 # Workflow execution
 def main():
@@ -586,7 +1095,7 @@ def main():
     input_group.add_argument(
         "-l", "--ligands", 
         required=False,
-        nargs='+', # accept multiple ligands
+        nargs='+',
         type=str, 
         help="Path(s) to the ligand file(s)."
     )
@@ -602,6 +1111,7 @@ def main():
 	"-aa", "--atom_type",
 	required=False,
 	type=str,
+	choices=["gaff", "amber", "gaff2", "amber2"],
 	default="gaff2",
 	help="Specify the atom type supported by acpype: gaff, amber, gaff2 (default), amber2"
     )
@@ -612,21 +1122,31 @@ def main():
 	default=0,
 	help="net molecular charge (int), default is -an=0"
     )
+
+    termini_capping_group =  parser.add_argument_group("Protein termini capping before protein topology generation")
+    termini_capping_group.add_argument(
+	"-cp", "--cap_protein",
+	required=False,
+	action="store_true",
+	help="Add ACE and NME terminal capping groups to the input protein PDB"
+    )
     
     gromacs_topology_group = parser.add_argument_group("Specify options for protein topology generation with gromacs")
     gromacs_topology_group.add_argument(
 	"-gff", "--force_field",
 	required=False,
 	type=str,
+	choices=["amber94", "amber96", "amber99", "amber99sb", "amber99sb-ildn", "amber03"],
 	default="amber99sb",
-	help="Specify the Force Fields supported by GROMACS: amber94, amber96, amber99, amber99sb (default), amber99sb-ildn, amber03, ambergs"
+	help="Specify the Force Fields supported by GROMACS"
     )
     gromacs_topology_group.add_argument(
 	"-gwm", "--water_model",
 	required=False,
 	type=str,
+	choices=["spc", "spce", "tip3p", "tip4p", "tip5p"],
 	default="tip3p",
-	help="Specify the water model: none, spc, spce, tip3p (default), tip4p, tip5p"
+	help="Specify the water model: spc, spce, tip3p (default), tip4p, tip5p"
     )
 
     gromacs_box_group = parser.add_argument_group("Specify options for box generation with gromacs")
@@ -634,6 +1154,7 @@ def main():
         "-gbt", "--box_type",
         required=False,
         type=str,
+	choices=["triclinic", "cubic", "dodecahedron", "octahedron"],
         default="cubic",
         help="Specify the box type supported by GROMACS: triclinic, cubic (default), dodecahedron, octahedron"
     )
@@ -650,6 +1171,7 @@ def main():
         "-gpi", "--pos_ion",
         required=False,
 	type=str,
+	choices=["NA", "K", "MG"],
         default="NA",
         help="Specify the monoatomic cation supported by the force field: NA (default), K, MG, etc"
     )
@@ -657,12 +1179,54 @@ def main():
 	"-gni", "--neg_ion",
         required=False,
         type=str,
+	choices=["CL", "F", "BR"],
         default="CL",
         help="Specify the monoatomic anion supported by the force field: CL (default), F, BR, etc"
     )
 
-
-
+    convergence_group = parser.add_argument_group("Automated checks to identify representative structures from converged trajectories")
+    convergence_group.add_argument(
+	"-oth", "--obs_thresholds",
+    	nargs="+",
+    	default=None,
+    	help=(
+            "Relative drift thresholds for slope/drift equilibration detection (default: 10%% drift, i.e. 0.10) "
+            "Specify as observable=value pairs, e.g., rmsd=0.1 potential=0.2 rgyr=0.1 pressure=0.2. "
+            "For relative thresholds, the value is multiplied by the standard deviation of the last half of the trajectory. "
+            "If omitted, default values are used for all enabled observables. "
+            "Example: rmsd=0.10 sets the RMSD drift tolerance to 10%% of the reference noise."
+        ),
+    )
+    convergence_group.add_argument(
+	"-rao", "--req_all_obs",
+    	action="store_true",
+    	help="If set, fill in missing observables with defaults. Otherwise, only use user-specified observables."
+    )
+    convergence_group.add_argument(
+        "-bs", "--block_size",
+        type=int,
+        default=100,
+        help="The amount of time (in ps) for each block (default: 100)"
+    )
+    convergence_group.add_argument(
+        "-wsb", "--window_size_blocks",
+        type=int,
+        default=5,
+        help="Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 5)"
+    )
+    convergence_group.add_argument(
+        "-ov", "--overlap",
+        type=float,
+        default=0,
+        help="The amount of time overlap (in ps) between consecutive blocks.(default: 0)"
+    )
+    convergence_group.add_argument(
+        "-rc", "--rmsd_cutoff",
+        type=float,
+        default=0.2,
+	help="RMSD cutoff in nm for clustering structures using the GROMOS method (default: 0.2 nm)"
+    )
+    
     steps_group = parser.add_argument_group("Specify the steps for the execution")
     steps_group.add_argument(
         "-fs", "--first_step",
@@ -683,7 +1247,6 @@ def main():
         action="store_true",
         help="List of Equilibrator steps and exit"
     )
-
     
     # Parse arguments
     args = parser.parse_args()
@@ -693,28 +1256,26 @@ def main():
     
     # defining variable for input files 
     ligand_files = args.ligands if args.ligands else []
-    
+
     protein_file = args.protein
-    print(protein_file, args.protein)
+    protein_capped = os.path.basename(args.protein).replace(".pdb", "_capped.pdb") if args.cap_protein else ""
     protein_name = os.path.splitext(os.path.basename(protein_file))[0]
     ligand_names = [os.path.splitext(os.path.basename(lig))[0] for lig in ligand_files]
     Project_dir = f"{protein_name}_{'_'.join(ligand_names)}" if ligand_files else protein_name
     
     # Creating the directory to store outputs
     output_dir = os.path.join(os.getcwd(), Project_dir)
-    os.makedirs(output_dir, exist_ok=True)    
+    os.makedirs(output_dir, exist_ok=True)
+    protein_capped_out = os.path.join(output_dir, protein_capped) if args.cap_protein else ""
     protein_gro = os.path.join(output_dir, f"{protein_name}_processed.gro")
     protein_gro_complex = protein_gro.replace('.gro','_complex.gro')
     merged_gro = os.path.join(output_dir, "merged.gro")
-
-    #protein_or_merged_gro = merged_gro if ligand_file else protein_gro        
     protein_or_merged_gro = merged_gro if ligand_files else protein_gro
-    
     box_gro = os.path.join(output_dir, "box.gro")
     solvated_gro = os.path.join(output_dir, "solvated.gro")
     topology_file = os.path.join(output_dir, "topol.top")
     minimized_gro = os.path.join(output_dir, "minimized.gro")
-    energy_plot = os.path.join(output_dir, f"{Project_dir}_potential.pdf")
+    energy_plot = os.path.join(output_dir, "potential.pdf")
     ions_tpr = os.path.join(output_dir, "ions.tpr")   
 
     # Prepare ligand related paths as lists
@@ -734,91 +1295,141 @@ def main():
         ligand_acpype_gro_list.append(os.path.join(acpype_dir, f"{ligand_name}_GMX.gro"))
         atomtypes_file_list.append(os.path.join(acpype_dir, "atomtypes.atp"))
     
-    # Equilibration workflow
-    equilibration_tpr = os.path.join(output_dir, "equilibration.tpr")
-    equilibration_edr = os.path.join(output_dir, "equilibration.edr")
-    equilibration_trr = os.path.join(output_dir, "equilibration.trr")
-    eq_potential_xvg = os.path.join(output_dir, "eq_potential.xvg")
-    eq_pressure_xvg = os.path.join(output_dir, "eq_pressure.xvg")
-    eq_temperature_xvg = os.path.join(output_dir, "eq_temperature.xvg")
-    eq_rmsd_xvg = os.path.join(output_dir, "eq_rmsd.xvg")
-    eq_rmsf_xvg = os.path.join(output_dir, "eq_rmsf.xvg")
-    eq_gyrate_xvg = os.path.join(output_dir, "eq_gyrate.xvg")
-    final_equilibrated_pdb = os.path.join(output_dir, "final_minimized_equilibrated.pdb")
-    final_last_equilibrated_pdb = os.path.join(output_dir, "final_minimized_equilibrated_last.pdb")
-    energy_minimization_results = os.path.join(output_dir, f"{Project_dir}_energy_minimization_results.pdf")
-    equilibration_analysis = os.path.join(output_dir, f"{Project_dir}_equilibration_analysis.pdf")
-    final_equilibrated_gro = os.path.join(output_dir, "final_minimized_equilibrated.gro")
+    # Minimization workflow
+    minimization_output = os.path.join(output_dir, "minimization_output")
+    os.makedirs(minimization_output, exist_ok=True)
+    em_tpr = os.path.join(minimization_output, "em.tpr")
+    em_edr = os.path.join(minimization_output, "em.edr")
+    em_trr = os.path.join(minimization_output, "em.trr")
+    pressure_xvg = os.path.join(minimization_output, "pressure.xvg")
+    potential_xvg = os.path.join(minimization_output, "potential.xvg")
+    rmsf_xvg = os.path.join(minimization_output, "rmsf.xvg")
+    rmsd_xvg = os.path.join(minimization_output, "rmsd.xvg")
+    solv_ions = os.path.join(minimization_output, "solv_ions.gro")
+    em_gro = os.path.join(minimization_output, "em.gro")
+    final_minimized = os.path.join(minimization_output, "minimized.pdb")
+    energy_minimization_results = os.path.join(minimization_output, "minimization_metrics_plot.pdf")
+    
+    # NVT workflow
+    nvt_output = os.path.join(output_dir, "nvt_output")
+    os.makedirs(nvt_output, exist_ok=True)
+    equilibration_tpr = os.path.join(nvt_output, "equilibration.tpr")
+    equilibration_edr = os.path.join(nvt_output, "equilibration.edr")
+    equilibration_trr = os.path.join(nvt_output, "equilibration.trr")
+    eq_potential_xvg = os.path.join(nvt_output, "eq_potential.xvg")
+    eq_pressure_xvg = os.path.join(nvt_output, "eq_pressure.xvg")
+    eq_temperature_xvg = os.path.join(nvt_output, "eq_temperature.xvg")
+    eq_rmsd_xvg = os.path.join(nvt_output, "eq_rmsd.xvg")
+    eq_rmsf_xvg = os.path.join(nvt_output, "eq_rmsf.xvg")
+    eq_gyrate_xvg = os.path.join(nvt_output, "eq_gyrate.xvg")
+    final_equilibrated_pdb = os.path.join(nvt_output, "nvt.pdb")
+    final_last_equilibrated_pdb = os.path.join(nvt_output, "nvt_last_frame.pdb")
+    equilibration_analysis = os.path.join(nvt_output, "nvt_metrics_plot.pdf")
+    final_equilibrated_gro = os.path.join(nvt_output, "nvt.gro")
 
     # NPT Equilibration workflow
-    npt_tpr = os.path.join(output_dir, "npt_equilibration.tpr")
-    npt_edr = os.path.join(output_dir, "npt_equilibration.edr")
-    npt_trr = os.path.join(output_dir, "npt_equilibration.trr")
-    npt_potential_xvg = os.path.join(output_dir, "npt_potential.xvg")
-    npt_pressure_xvg = os.path.join(output_dir, "npt_pressure.xvg")
-    npt_temperature_xvg = os.path.join(output_dir, "npt_temperature.xvg")
-    npt_rmsd_xvg = os.path.join(output_dir, "npt_rmsd.xvg")
-    npt_rmsf_xvg = os.path.join(output_dir, "npt_rmsf.xvg")
-    npt_gyrate_xvg = os.path.join(output_dir, "npt_gyrate.xvg")
-    final_npt_pdb = os.path.join(output_dir, "final_npt_equilibrated.pdb")
-    final_npt_gro = os.path.join(output_dir, "final_npt_equilibrated.gro")
-    final_last_npt_pdb = os.path.join(output_dir, "final_npt_equilibrated_last.pdb")
-    npt_analysis_pdf = os.path.join(output_dir, f"{Project_dir}_npt_equilibration_analysis.pdf")
-    
-    # Minimization workflow
-    em_tpr = os.path.join(output_dir, "em.tpr")
-    em_edr = os.path.join(output_dir, "em.edr")
-    em_trr = os.path.join(output_dir, "em.trr")
-    pressure_xvg = os.path.join(output_dir, "pressure.xvg")
-    potential_xvg = os.path.join(output_dir, "potential.xvg")
-    rmsf_xvg = os.path.join(output_dir, "rmsf.xvg")
-    solv_ions = os.path.join(output_dir, "solv_ions.gro")
-    em_gro = os.path.join(output_dir, "em.gro")
-    final_minimized = os.path.join(output_dir, "final_minimized.pdb")
-    
+    npt_output = os.path.join(output_dir, "npt_output")
+    os.makedirs(npt_output, exist_ok=True)
+    npt_tpr = os.path.join(npt_output, "npt_equilibration.tpr")
+    npt_edr = os.path.join(npt_output, "npt_equilibration.edr")
+    npt_trr = os.path.join(npt_output, "npt_equilibration.trr")
+    npt_potential_xvg = os.path.join(npt_output, "npt_potential.xvg")
+    npt_pressure_xvg = os.path.join(npt_output, "npt_pressure.xvg")
+    npt_temperature_xvg = os.path.join(npt_output, "npt_temperature.xvg")
+    npt_rmsd_xvg = os.path.join(npt_output, "npt_rmsd.xvg")
+    npt_rmsf_xvg = os.path.join(npt_output, "npt_rmsf.xvg")
+    npt_gyrate_xvg = os.path.join(npt_output, "npt_gyrate.xvg")
+    final_npt_pdb = os.path.join(npt_output, "npt.pdb")
+    final_npt_gro = os.path.join(npt_output, "npt.gro")
+    final_last_npt_pdb = os.path.join(npt_output, "npt_last_frame.pdb")
+    npt_analysis_pdf = os.path.join(npt_output, "npt_metrics_plot.pdf")
+
+    # Production workflow
+    production_output = os.path.join(output_dir, "production_output")
+    os.makedirs(production_output, exist_ok=True)
+    production_tpr = os.path.join(production_output, "production_stage.tpr")
+    production_edr = os.path.join(production_output, "production_stage.edr")
+    production_trr = os.path.join(production_output, "production_stage.trr")
+    production_potential_xvg = os.path.join(production_output, "production_potential.xvg")
+    production_pressure_xvg = os.path.join(production_output, "production_pressure.xvg")
+    production_temperature_xvg = os.path.join(production_output, "production_temperature.xvg")
+    production_rmsd_xvg = os.path.join(production_output, "production_rmsd.xvg")
+    production_rmsf_xvg = os.path.join(production_output, "production_rmsf.xvg")
+    production_gyrate_xvg = os.path.join(production_output, "production_gyrate.xvg")
+    final_production_pdb = os.path.join(production_output, "production.pdb")
+    final_production_gro = os.path.join(production_output, "production.gro")
+    final_last_production_pdb = os.path.join(production_output, "production_last_frame.pdb")
+    production_analysis_pdf = os.path.join(production_output, "production_metrics_plot.pdf")
+
+    # OBSERVABLE → XVG mapping
+    OBSERVABLE_XVG = {
+        "potential": production_potential_xvg,
+        "pressure": production_pressure_xvg,
+        "rmsd": production_rmsd_xvg,
+        "rgyr": production_gyrate_xvg
+    }
+
+    # Clustering analyses
+    clustering_anl = os.path.join(output_dir, "clustering_anls")
+
     equilibrator_steps = []
+    # === Protein Capping ===
+    if args.cap_protein:
+       equilibrator_steps.append((f"Adding ACE and NME terminal capping groups to the protein: {protein_name}", lambda: termini_capping(protein_file, protein_capped_out, do_capping=args.cap_protein)))
+        
     # === Protein Topology ===
-    equilibrator_steps.append(("Generate topology for protein", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
+    if args.cap_protein:
+        equilibrator_steps.append((f"Generating topology for the protein: {protein_capped}", lambda: generate_topology_protein(protein_capped_out, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
+    else:
+        equilibrator_steps.append((f"Generating topology for the protein: {protein_name}", lambda: generate_topology_protein(protein_file, topology_file, protein_gro, output_dir, force_field=args.force_field, water_model=args.water_model)))
 
     # === Ligand Prep ===
     for ligand_file, ligand_mol2, ligand_name in zip(ligand_files, ligand_mol2_list, ligand_names):	
-    	equilibrator_steps.append((f"Convert PDB to MOL2 for ligand {ligand_name}", lambda lf=ligand_file, lm=ligand_mol2: pdb_2_mol2(lf, lm)))
-    	equilibrator_steps.append((f"Generate topology for ligand {ligand_name}", lambda lm=ligand_mol2, ln=ligand_name: generate_topology_ligand(lm, ln, output_dir, atom_type=args.atom_type, net_charge=args.net_charge)))
+    	equilibrator_steps.append((f"Converting {ligand_name} PDB to MOL2", lambda lf=ligand_file, lm=ligand_mol2: pdb_2_mol2(lf, lm)))
+    	equilibrator_steps.append((f"Generating topology for the ligand: {ligand_name}", lambda lm=ligand_mol2, ln=ligand_name: generate_topology_ligand(lm, ln, output_dir, atom_type=args.atom_type, net_charge=args.net_charge)))
+    
 
     # === Merge Prep ===
-    #equilibrator_steps.append(("Prepare to merge topology file(s) if ligand provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp, ligand_top, ligand_name, output_dir, ligand_file)))
-    equilibrator_steps.append(("Prepare to merge topology file(s) if ligands provided", lambda: prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, ligand_names, output_dir, bool(ligand_files))))
+    equilibrator_steps.append(("Checking wether merging topology file(s) is necessary", lambda: prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, ligand_names, output_dir, bool(ligand_files))))
     
     if ligand_files:
-        equilibrator_steps.append(("Make a copy of protein", lambda: make_copy_of_protein(protein_gro, protein_gro_complex)))
-        equilibrator_steps.append(("Merge topologies", lambda: merge_topologies(protein_gro_complex, ligand_acpype_gro_list, merged_gro, True)))
+        equilibrator_steps.append((f"Making a copy of the protein: {protein_file}", lambda: make_copy_of_protein(protein_gro, protein_gro_complex)))
+        equilibrator_steps.append(("Merging topologies", lambda: merge_topologies(protein_gro_complex, ligand_acpype_gro_list, merged_gro, True)))
 
     ## Modify ligand itp(s) to comment [ atomtypes ] and update main topology before ion addition and minimization
-    equilibrator_steps.append(("Combine and insert unique atomtypes into main topology", lambda: combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file)))
+    equilibrator_steps.append(("Combining and inserting unique atomtypes into main topology", lambda: combine_and_insert_unique_atomtypes(ligand_itp_list, topology_file)))
      
     # Simulation setup
     # === Simulation Setup ===
-    equilibrator_steps.append(("Create the simulation box", lambda: create_simulation_box(protein_or_merged_gro, box_gro, box_type=args.box_type, distance=args.distance)))
-    equilibrator_steps.append(("Solvate the system", lambda: solvate_system(box_gro, solvated_gro, topology_file, water_model=args.water_model)))
-    equilibrator_steps.append(("Add ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file, ions_tpr, output_dir, pos_ion=args.pos_ion, neg_ion=args.neg_ion)))
+    equilibrator_steps.append(("Creating the simulation box", lambda: create_simulation_box(protein_or_merged_gro, box_gro, box_type=args.box_type, distance=args.distance)))
+    equilibrator_steps.append(("Solvating the system", lambda: solvate_system(box_gro, solvated_gro, topology_file, water_model=args.water_model)))
+    equilibrator_steps.append(("Adding ions to neutralize the system", lambda: add_ions(IONS_MDP, solvated_gro, solv_ions, topology_file, ions_tpr, output_dir, pos_ion=args.pos_ion, neg_ion=args.neg_ion)))
     
     # === Energy Minimization ===
-    equilibrator_steps.append(("Run energy minimization", lambda: minimize_energy(MINIM_MDP, solv_ions, minimized_gro, topology_file, em_tpr, em_edr, potential_xvg, output_dir)))
-    equilibrator_steps.append(("Plot potential energy", lambda: plot_energy_results(potential_xvg, energy_plot)))
-    equilibrator_steps.append(("Obtain potential, backbone, and pressure xvgs", lambda: get_potential_backbone_pressure_xvgs(em_edr, em_tpr, potential_xvg, rmsf_xvg, pressure_xvg, em_trr)))
-    equilibrator_steps.append(("Plot panel of additional energy minimization results", lambda: plot_em_results(potential_xvg, pressure_xvg, rmsf_xvg, energy_minimization_results)))
-    equilibrator_steps.append(("Get final minimized pdb structure", lambda: get_final_minimized_structure(em_tpr, em_trr, final_minimized)))
+    equilibrator_steps.append(("Running energy minimization", lambda: minimize_energy(MINIM_MDP, solv_ions, minimized_gro, topology_file, em_tpr, em_edr, potential_xvg, output_dir)))
+    equilibrator_steps.append(("Plotting potential energy", lambda: plot_energy_results(potential_xvg, energy_plot)))
+    equilibrator_steps.append(("Obtaining potential, backbone, and pressure xvgs", lambda: get_potential_backbone_pressure_xvgs(em_edr, em_tpr, potential_xvg, rmsf_xvg, pressure_xvg, em_trr)))
+    equilibrator_steps.append(("Plotting additional energy minimization metrics", lambda: plot_em_results(potential_xvg, pressure_xvg, rmsf_xvg, energy_minimization_results)))
+    equilibrator_steps.append(("Getting final minimized pdb structure", lambda: get_final_minimized_structure(em_tpr, em_trr, final_minimized)))
 
     # === NVT Equilibration ===
-    equilibrator_steps.append(("Run NVT equilibration", lambda: make_refinement(topology_file, equilibration_tpr, em_gro, output_dir
+    equilibrator_steps.append(("Running NVT equilibration", lambda: run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir
     )))
-    equilibrator_steps.append(("Get NVT equilibration output", lambda: get_refinement_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro
+    equilibrator_steps.append(("Getting NVT equilibration output", lambda: get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro
     )))
 
     #===NPT Equilibration ===
-    equilibrator_steps.append(("Run NPT equilibration", lambda: Run_NPT_Equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb, output_dir
+    equilibrator_steps.append(("Running NPT equilibration", lambda: run_NPT_equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb, output_dir
     )))
-    equilibrator_steps.append(("Get NPT equilibration output", lambda: get_refinement_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf, final_npt_gro
+    equilibrator_steps.append(("Getting NPT equilibration output", lambda: get_equilibration_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf, final_npt_gro
+    )))
+
+    #===Production stage ==
+    equilibrator_steps.append(("Running Production stage", lambda: run_production_stage(topology_file, production_tpr, final_npt_gro, output_dir
+    )))    
+    equilibrator_steps.append(("Getting Production output", lambda: get_equilibration_output(production_edr, production_potential_xvg, production_pressure_xvg, production_temperature_xvg, production_tpr, production_trr, production_rmsd_xvg, production_rmsf_xvg, production_gyrate_xvg, final_last_production_pdb, final_production_pdb, production_analysis_pdf, final_production_gro
+    )))
+    equilibrator_steps.append(("Getting convergence and clustering", lambda: get_convergence_clustering(output_dir, clustering_anl, production_tpr, production_trr, obs_xvg_dict=OBSERVABLE_XVG, block_size=args.block_size, overlap=args.overlap, thresholds=args.obs_thresholds, default_thresholds=DEFAULT_OBS_THRESHOLDS, method="slope_drift", window_size_blocks=args.window_size_blocks, cluster_cutoff=args.rmsd_cutoff, cluster_group="non-Water non-Water", req_all_obs=args.req_all_obs,  
     )))
 
     if args.last_step is None:
@@ -827,6 +1438,8 @@ def main():
         list_equilibrator_steps(equilibrator_steps)
         return
     run_equilibrator_steps(equilibrator_steps, args)
+
+    equilibrator_elapsed_time(stime)
     
 if __name__ == "__main__":
     main()
