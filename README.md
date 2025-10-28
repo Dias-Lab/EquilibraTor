@@ -41,7 +41,7 @@ pip install -e .
 
 - **GROMACS Preprocessing** — 🟦 
 
-- **Energy Minimization & Equilibration** — 🟧 
+- **Energy Minimization, NVT/NPT stages, production stage, and convergence** — 🟧 
 
 - **EquilibraTor Outputs** — 🟩 
 
@@ -306,16 +306,11 @@ Available steps:
 23: Getting convergence and clustering
 ```
 
-To run EquilibraTor using this protein-ligand files:
+To run EquilibraTor using these protein-ligand files:
 
 ```Text
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb
 ```
-
-```Text
-EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb
-```
-
 
 ## 💾 Outputs
 
