@@ -56,9 +56,8 @@ EquilibraTor -h
 ```
 
 ```
-usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp] [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}]
-                    [-gwm {spc,spce,tip3p,tip4p,tip5p}] [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}] [-gni {CL,F,BR}] [-oth OBS_THRESHOLDS [OBS_THRESHOLDS ...]] [-rao]
-                    [-bs BLOCK_SIZE] [-wsb WINDOW_SIZE_BLOCKS] [-ov OVERLAP] [-rc RMSD_CUTOFF] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
+usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp] [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}] [-gwm {spc,spce,tip3p,tip4p,tip5p}] [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}]
+                    [-gni {CL,F,BR}] [-oth OBS_THRESHOLDS [OBS_THRESHOLDS ...]] [-rao] [-bs BLOCK_SIZE] [-wsb WINDOW_SIZE_BLOCKS] [-ov OVERLAP] [-rc RMSD_CUTOFF] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
@@ -113,9 +112,9 @@ Automated checks to identify representative structures from converged trajectori
                         Relative drift thresholds for slope/drift equilibration detection (default: 10% drift, i.e. 0.10) Specify as observable=value pairs, e.g., rmsd=0.1 potential=0.2 rgyr=0.1 pressure=0.2. For relative thresholds, the value is multiplied by the standard deviation of the last half of the trajectory. If omitted, default values are used for all enabled observables. Example: rmsd=0.10 sets the RMSD drift tolerance to 10% of the reference noise.
   -rao, --req_all_obs   If set, fill in missing observables with defaults. Otherwise, only use user-specified observables.
   -bs BLOCK_SIZE, --block_size BLOCK_SIZE
-                        The amount of time (in ps) for each block (default: 100)
+                        The amount of time (in ps) for each block (default: 10)
   -wsb WINDOW_SIZE_BLOCKS, --window_size_blocks WINDOW_SIZE_BLOCKS
-                        Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 5)
+                        Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 10)
   -ov OVERLAP, --overlap OVERLAP
                         The amount of time overlap (in ps) between consecutive blocks.(default: 0)
   -rc RMSD_CUTOFF, --rmsd_cutoff RMSD_CUTOFF
@@ -169,11 +168,10 @@ Available steps:
 13: Getting NVT equilibration output
 14: Running NPT equilibration
 15: Getting NPT equilibration output
-16: Running Production stage
-17: Getting Production output
-18: Getting convergence and clustering
+16: Getting convergence and clustering
+17: Running Production stage
+18: Getting Production output
 ```
-
 
 To show the EquilibraTor steps to be performed for a protein file, when the protein capping feature is enabled:
 
@@ -229,6 +227,7 @@ To show the EquilibraTor steps to be performed when provided both protein and li
 
 ```Text
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -as
+
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
@@ -260,10 +259,11 @@ Available steps:
 17: Getting NVT equilibration output
 18: Running NPT equilibration
 19: Getting NPT equilibration output
-20: Running Production stage
-21: Getting Production output
-22: Getting convergence and clustering
+20: Getting convergence and clustering
+21: Running Production stage
+22: Getting Production output
 ```
+
 To show the EquilibraTor steps to be performed when provided both protein and ligand files, enabling the protein capping feature:
 
 ```
@@ -301,9 +301,9 @@ Available steps:
 18: Getting NVT equilibration output
 19: Running NPT equilibration
 20: Getting NPT equilibration output
-21: Running Production stage
-22: Getting Production output
-23: Getting convergence and clustering
+21: Getting convergence and clustering
+22: Running Production stage
+23: Getting Production output
 ```
 
 To run EquilibraTor using these protein-ligand files:
@@ -345,27 +345,27 @@ EQUILIBRATION ANALYSIS REPORT
 ============================================================
 
 Analysis mode: Single observable (rmsd)
-Block size: 100 ps
+Block size: 10 ps
 Block overlap: 0 ps
-Total simulation time: 10000.0 ps
+Total simulation time: 500.0 ps
 
 EQUILIBRATION TIMES BY OBSERVABLE:
 ------------------------------------------------------------
-  rmsd                                       3400.0 ps (threshold=0.1)
+  rmsd                                         50.0 ps (threshold=0.1)
 
 OTHER OBSERVABLES (analyzed but not used for equilibration):
 ------------------------------------------------------------
-  production_potential.xvg                 [not used]
-  production_pressure.xvg                  [not used]
-  production_rmsd.xvg                      [not used]
-  production_gyrate.xvg                    [not used]
+  npt_potential.xvg                        [not used]
+  npt_pressure.xvg                         [not used]
+  npt_rmsd.xvg                             [not used]
+  npt_gyrate.xvg                           [not used]
 
 ------------------------------------------------------------
-FINAL EQUILIBRATION START: 3400.0 ps
-EQUILIBRATED SEGMENT: 3400.0 - 10000.0 ps
-EQUILIBRATED LENGTH: 6600.0 ps
+FINAL EQUILIBRATION START: 50.0 ps
+EQUILIBRATED SEGMENT: 50.0 - 500.0 ps
+EQUILIBRATED LENGTH: 450.0 ps
 ------------------------------------------------------------
 
 ```
 
-In this example, RMSD reaches its stability threshold (0.1) at 3400 ps, marking the start of equilibration. The equilibrated segment spans from 3400 ps to the full 10000 ps trajectory, corresponding to a total equilibrated duration of 6600 ps. Only this portion is used for structural clustering, and representative frame extraction.
+In this example, RMSD reaches its stability threshold (0.1) at 50 ps, marking the start of equilibration. The equilibrated segment spans from 50 ps to the full 500 ps trajectory, corresponding to a total equilibrated duration of 450 ps. Only this portion is used for structural clustering, and from the largest cluster (cluster1), the time in(ps) for the middle representative is used to run the production stage.
