@@ -353,13 +353,6 @@ EQUILIBRATION TIMES BY OBSERVABLE:
 ------------------------------------------------------------
   rmsd                                         50.0 ps (threshold=0.1)
 
-OTHER OBSERVABLES (analyzed but not used for equilibration):
-------------------------------------------------------------
-  npt_potential.xvg                        [not used]
-  npt_pressure.xvg                         [not used]
-  npt_rmsd.xvg                             [not used]
-  npt_gyrate.xvg                           [not used]
-
 ------------------------------------------------------------
 FINAL EQUILIBRATION START: 50.0 ps
 EQUILIBRATED SEGMENT: 50.0 - 500.0 ps
