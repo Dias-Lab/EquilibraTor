@@ -56,9 +56,8 @@ EquilibraTor -h
 ```
 
 ```
-usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp] [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}]
-                    [-gwm {spc,spce,tip3p,tip4p,tip5p}] [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}] [-gni {CL,F,BR}] [-oth OBS_THRESHOLDS [OBS_THRESHOLDS ...]] [-rao]
-                    [-bs BLOCK_SIZE] [-wsb WINDOW_SIZE_BLOCKS] [-ov OVERLAP] [-rc RMSD_CUTOFF] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
+usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,gaff2,amber2}] [-an NET_CHARGE] [-cp] [-gff {amber94,amber96,amber99,amber99sb,amber99sb-ildn,amber03}] [-gwm {spc,spce,tip3p,tip4p,tip5p}] [-gbt {triclinic,cubic,dodecahedron,octahedron}] [-gd DISTANCE] [-gpi {NA,K,MG}]
+                    [-gni {CL,F,BR}] [-oth OBS_THRESHOLDS [OBS_THRESHOLDS ...]] [-rao] [-bs BLOCK_SIZE] [-wsb WINDOW_SIZE_BLOCKS] [-ov OVERLAP] [-rc RMSD_CUTOFF] [-fs FIRST_STEP] [-ls LAST_STEP] [-as]
 
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
@@ -113,9 +112,9 @@ Automated checks to identify representative structures from converged trajectori
                         Relative drift thresholds for slope/drift equilibration detection (default: 10% drift, i.e. 0.10) Specify as observable=value pairs, e.g., rmsd=0.1 potential=0.2 rgyr=0.1 pressure=0.2. For relative thresholds, the value is multiplied by the standard deviation of the last half of the trajectory. If omitted, default values are used for all enabled observables. Example: rmsd=0.10 sets the RMSD drift tolerance to 10% of the reference noise.
   -rao, --req_all_obs   If set, fill in missing observables with defaults. Otherwise, only use user-specified observables.
   -bs BLOCK_SIZE, --block_size BLOCK_SIZE
-                        The amount of time (in ps) for each block (default: 100)
+                        The amount of time (in ps) for each block (default: 10)
   -wsb WINDOW_SIZE_BLOCKS, --window_size_blocks WINDOW_SIZE_BLOCKS
-                        Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 5)
+                        Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 10)
   -ov OVERLAP, --overlap OVERLAP
                         The amount of time overlap (in ps) between consecutive blocks.(default: 0)
   -rc RMSD_CUTOFF, --rmsd_cutoff RMSD_CUTOFF
@@ -169,11 +168,10 @@ Available steps:
 13: Getting NVT equilibration output
 14: Running NPT equilibration
 15: Getting NPT equilibration output
-16: Running Production stage
-17: Getting Production output
-18: Getting convergence and clustering
+16: Getting convergence and clustering
+17: Running Production stage
+18: Getting Production output
 ```
-
 
 To show the EquilibraTor steps to be performed for a protein file, when the protein capping feature is enabled:
 
@@ -229,6 +227,7 @@ To show the EquilibraTor steps to be performed when provided both protein and li
 
 ```Text
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -as
+
    ____          _ ___ __           ______        
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
@@ -260,10 +259,11 @@ Available steps:
 17: Getting NVT equilibration output
 18: Running NPT equilibration
 19: Getting NPT equilibration output
-20: Running Production stage
-21: Getting Production output
-22: Getting convergence and clustering
+20: Getting convergence and clustering
+21: Running Production stage
+22: Getting Production output
 ```
+
 To show the EquilibraTor steps to be performed when provided both protein and ligand files, enabling the protein capping feature:
 
 ```
@@ -301,9 +301,9 @@ Available steps:
 18: Getting NVT equilibration output
 19: Running NPT equilibration
 20: Getting NPT equilibration output
-21: Running Production stage
-22: Getting Production output
-23: Getting convergence and clustering
+21: Getting convergence and clustering
+22: Running Production stage
+23: Getting Production output
 ```
 
 To run EquilibraTor using these protein-ligand files:
@@ -340,32 +340,74 @@ Following analysis, EquilibraTor automatically generates an **Equilibration Anal
 
 Example report:
 
+In this example, RMSD reaches its stability threshold (0.1) at 50 ps, marking the start of equilibration. The equilibrated segment spans from 50 ps to >
+
 ```
 EQUILIBRATION ANALYSIS REPORT
 ============================================================
 
 Analysis mode: Single observable (rmsd)
-Block size: 100 ps
+Block size: 10 ps
 Block overlap: 0 ps
-Total simulation time: 10000.0 ps
+Total simulation time: 500.0 ps
 
 EQUILIBRATION TIMES BY OBSERVABLE:
 ------------------------------------------------------------
-  rmsd                                       3400.0 ps (threshold=0.1)
-
-OTHER OBSERVABLES (analyzed but not used for equilibration):
-------------------------------------------------------------
-  production_potential.xvg                 [not used]
-  production_pressure.xvg                  [not used]
-  production_rmsd.xvg                      [not used]
-  production_gyrate.xvg                    [not used]
+  rmsd                                         50.0 ps (threshold=0.1)
 
 ------------------------------------------------------------
-FINAL EQUILIBRATION START: 3400.0 ps
-EQUILIBRATED SEGMENT: 3400.0 - 10000.0 ps
-EQUILIBRATED LENGTH: 6600.0 ps
+FINAL EQUILIBRATION START: 50.0 ps
+EQUILIBRATED SEGMENT: 50.0 - 500.0 ps
+EQUILIBRATED LENGTH: 450.0 ps
 ------------------------------------------------------------
 
 ```
 
-In this example, RMSD reaches its stability threshold (0.1) at 3400 ps, marking the start of equilibration. The equilibrated segment spans from 3400 ps to the full 10000 ps trajectory, corresponding to a total equilibrated duration of 6600 ps. Only this portion is used for structural clustering, and representative frame extraction.
+After running EquilibraTor with the protein and ligand examples, the execution steps during the execution should be printed in the terminal:
+
+
+```
+   ____          _ ___ __           ______        
+  / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
+ / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
+/___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
+      /_/
+Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
+Developer: José D. D. Cediel-Becerra
+Co-developers: Jose Cleydson F. Silva and Raquel Dias
+Afiliation: Microbiology & Cell Science Deparment, University of Florida
+If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Version:v1.0.0
+
+[1] - 2025-10-29 12:16:08,786 - INFO - Generating topology for the protein: example_protein
+[2] - 2025-10-29 12:16:10,386 - INFO - Converting example_ligand PDB to MOL2
+[3] - 2025-10-29 12:16:11,767 - INFO - Generating topology for the ligand: example_ligand
+[4] - 2025-10-29 12:16:13,824 - INFO - Checking wether merging topology file(s) is necessary
+[5] - 2025-10-29 12:16:13,854 - INFO - Making a copy of the protein: example/example_protein.pdb
+[6] - 2025-10-29 12:16:14,396 - INFO - Merging topologies
+[7] - 2025-10-29 12:16:14,400 - INFO - Combining and inserting unique atomtypes into main topology
+[8] - 2025-10-29 12:16:14,407 - INFO - Creating the simulation box
+[9] - 2025-10-29 12:16:15,008 - INFO - Solvating the system
+[10] - 2025-10-29 12:16:16,075 - INFO - Adding ions to neutralize the system
+[11] - 2025-10-29 12:16:17,516 - INFO - Running energy minimization
+[12] - 2025-10-29 12:16:44,929 - INFO - Plotting potential energy
+[13] - 2025-10-29 12:16:45,501 - INFO - Obtaining potential, backbone, and pressure xvgs
+[14] - 2025-10-29 12:16:47,081 - INFO - Plotting additional energy minimization metrics
+[15] - 2025-10-29 12:16:47,371 - INFO - Getting final minimized pdb structure
+[16] - 2025-10-29 12:16:47,883 - INFO - Running NVT equilibration
+[17] - 2025-10-29 12:21:46,878 - INFO - Getting NVT equilibration output
+[18] - 2025-10-29 12:22:02,541 - INFO - Running NPT equilibration
+[19] - 2025-10-29 12:27:27,176 - INFO - Getting NPT equilibration output
+[20] - 2025-10-29 12:27:47,183 - INFO - Getting convergence and clustering
+[21] - 2025-10-29 12:27:47,184 - INFO - Observables thresholds requested: {'rmsd': 0.1}
+[22] - 2025-10-29 12:28:28,234 - INFO - Equilibration report written to: convergence_report.txt
+[23] - 2025-10-29 12:28:28,237 - INFO - Extracting trajectory segment from 50 ps to the end of the simulation
+[24] - 2025-10-29 12:28:32,255 - INFO - Clustering equilibrated trajectory with a RMSD cutoff value of 0.2
+[25] - 2025-10-29 12:28:36,256 - INFO - Clustered representative structures saved at: /example_protein_example_ligand/clustering_anls/rep_structures.pdb
+[26] - 2025-10-29 12:28:36,261 - INFO - Extracted MODEL 1 (cluster 1, 384.0 ps) to: /example_protein_example_ligand/clustering_anls/middle_repre_cluster1.pdb
+[27] - 2025-10-29 12:28:36,261 - INFO - Extracting frame trajectory 384.0 ps to be used for production md
+[28] - 2025-10-29 12:28:39,773 - INFO - Running Production stage
+[29] - 2025-10-29 14:33:46,239 - INFO - Getting Production output
+[30] - 2025-10-29 14:37:29,812 - INFO - Execution time: 2.36 hours
+
+```

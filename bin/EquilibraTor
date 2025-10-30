@@ -103,6 +103,52 @@ def list_equilibrator_steps(pipeline_steps):
     for i, (name, _) in enumerate(pipeline_steps, 1):
         print(f"{i}: {name}")
 
+def inspect_input_files(protein_file, ligand_files=None):
+    """
+    Checks that the provided protein file exists and is valid.
+    Optionally checks ligand files if provided (ligand_files can be a list or None).
+
+    Parameters
+    ----------
+    protein_file : str
+        Path to the protein PDB file (required).
+    ligand_files : list[str] or str or None
+        One or more ligand PDB files (optional).
+    """
+
+    # --- Check protein ---
+    if not protein_file:
+        logging.error("No protein file provided.")
+        sys.exit()
+
+    if not os.path.isfile(protein_file):
+        logging.error(f"Protein file not found: {protein_file}")
+        sys.exit()
+
+    if os.path.getsize(protein_file) == 0:
+        logging.error(f"Protein file is empty: {protein_file}")
+        sys.exit()
+
+    logging.debug(f"Protein file verified: {protein_file}")
+
+    # --- Check ligands (optional) ---
+    if not ligand_files:
+        logging.debug("No ligand files provided. Proceeding with protein-only workflow.")
+        return
+
+    # Normalize to list
+    if isinstance(ligand_files, str):
+        ligand_files = [ligand_files]
+
+    for ligand_file in ligand_files:
+        if not os.path.isfile(ligand_file):
+            logging.error(f"Ligand file not found: {ligand_file}")
+            sys.exit()
+        if os.path.getsize(ligand_file) == 0:
+            logging.error(f"Ligand file is empty: {ligand_file}")
+            sys.exit()
+        logging.debug(f"Ligand file verified: {ligand_file}")
+
 def run_command(command, cwd=None):
     """Run a shell command and return its stdout as a string."""
     try:
@@ -580,8 +626,8 @@ def get_last_frame_time(trr_file):
         raise RuntimeError("Could not determine last frame time from trajectory.")
 
 def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
-                                  final_last_equilibrated_pdb, final_equilibrated_gro, final_equilibrated_pdb,
-                                  group1="non-Water", group2="System"):
+                                  final_last_equilibrated_pdb, final_equilibrated_pdb,
+                                  group1="non-Water"):
     """Extract the last frame and produce nojump trajectories, robustly."""
     last_frame_time = get_last_frame_time(equilibration_trr)
 
@@ -593,11 +639,6 @@ def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
     get_movie_pdb = (
         f"echo '{group1}' | gmx trjconv -s {equilibration_tpr} -f {equilibration_trr} "
         f"-o {final_equilibrated_pdb} -pbc nojump"
-    )
-
-    get_movie_gro = (
-        f"echo '{group2}' | gmx trjconv -s {equilibration_tpr} -f {equilibration_trr} "
-        f"-o {final_equilibrated_gro} -pbc nojump"
     )
 
     try:
@@ -612,11 +653,6 @@ def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
         logging.error(f"Failed to generate nojump PDB trajectory to {final_equilibrated_pdb}: {e}")
         raise
 
-    try:
-        run_command(get_movie_gro)
-    except Exception as e:
-        logging.error(f"Failed to generate nojump GRO trajectory to {final_equilibrated_gro}: {e}")
-        raise
 
 def run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir):
     """Run NVT equilibration with robust error handling."""
@@ -637,7 +673,7 @@ def run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir):
 
 def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg,
                              equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg,
-                             final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro):
+                             final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis):
     commands = [
         (f"echo 'Potential' | gmx energy -f {equilibration_edr} -o {eq_potential_xvg}", "Extract potential energy"),
         (f"echo 'Pressure' | gmx energy -f {equilibration_edr} -o {eq_pressure_xvg}", "Extract pressure"),
@@ -656,7 +692,7 @@ def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xv
 
     try:
         extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
-                                     final_last_equilibrated_pdb, final_equilibrated_gro, final_equilibrated_pdb)
+                                     final_last_equilibrated_pdb, final_equilibrated_pdb)
     except Exception as e:
         logging.error(f"Failed in extract_last_frame_and_unwrap: {e}")
         raise
@@ -684,9 +720,9 @@ def run_NPT_equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb, o
         logging.error(f"Failed to run mdrun for NPT equilibration: {e}")
         raise
 
-def run_production_stage(topology_file, production_tpr, npt_gro, output_dir):
+def run_production_stage(npt_cpt, topology_file, production_tpr, md_gro, output_dir):
     """Run production MD stage with robust error handling."""
-    grompp_cmd = f"gmx grompp -f {PRODUCTION_MDP} -c {npt_gro} -p {topology_file} -o {production_tpr}"
+    grompp_cmd = f"gmx grompp -f {PRODUCTION_MDP} -c {md_gro} -t {npt_cpt} -p {topology_file} -o {production_tpr}"
     mdrun_cmd = f"gmx mdrun -s {production_tpr} -deffnm {production_tpr.replace('.tpr','')}"
 
     try:
@@ -700,7 +736,7 @@ def run_production_stage(topology_file, production_tpr, npt_gro, output_dir):
     except Exception as e:
         logging.error(f"Failed to run mdrun for production stage: {e}")
         raise
-
+	
 def analyze_blocks(xvg_file, block_size, overlap, total_time, output_dir):
     """Perform block averaging using gmx analyze and return list of (start, end, avg, std)."""
     blocks = []
@@ -793,12 +829,58 @@ def extract_trajectory_segment(clustering_anl, tpr_file, trr_file, output_trr, s
     run_command(f"echo 'System' | {cmd}", cwd=clustering_anl)
     return output_trr
     
-def cluster_equilibrated_trajectory(output_dir, tpr_file, equil_trr, output_pdb, cutoff=0.1, group="non-Water non-Water"):
+def cluster_equilibrated_trajectory(output_dir, tpr_file, equil_trr, output_pdb, cutoff=0.1, group="Backbone Backbone"):
     cmd = f"echo '{group}' | gmx cluster -s {tpr_file} -f {equil_trr} -method gromos -cutoff {cutoff} -cl {output_pdb}"
     logging.info(f"Clustering equilibrated trajectory with a RMSD cutoff value of {cutoff}")
     run_command(cmd, cwd=output_dir)
-    logging.info(f"Representative structure saved at: {output_pdb}")
-    return output_pdb
+    logging.info(f"Clustered representative structures saved at: {output_pdb}")
+
+def extract_middle_representative_model1(rep_pdb, clustering_anl):
+    """
+    Extracts MODEL 1 (the first cluster representative) from a gmx cluster PDB file.
+    Writes output as 'middle_repre_cluster1.pdb' and returns the middle frame time (e.g., 358.000).
+    """
+    output_pdb = os.path.join(clustering_anl, "middle_repre_cluster1.pdb")
+    inside = False
+    middle_frame = None
+
+    with open(rep_pdb) as fin, open(output_pdb, "w") as fout:
+        for line in fin:
+            # Capture the middle frame time (from TITLE line)
+            if line.startswith("TITLE") and "t=" in line:
+                try:
+                    middle_frame = float(line.strip().split("t=")[1])
+                except (IndexError, ValueError):
+                    pass
+
+            # Start writing when MODEL 1 begins
+            if line.startswith("MODEL"):
+                try:
+                    model_num = int(line.split()[1])
+                except (IndexError, ValueError):
+                    continue
+                if model_num == 1:
+                    inside = True
+                    fout.write(line)
+                    continue
+
+            # Stop immediately after ENDMDL
+            if inside:
+                fout.write(line)
+                if line.startswith("ENDMDL"):
+                    break
+
+    logging.info(f"Extracted MODEL 1 (cluster 1, {middle_frame} ps) to: {output_pdb}")
+    return middle_frame
+
+def get_gro_middle_representative_model1(clustering_anl, middle_frame_ps, tpr_file, equil_trr, middle_frame_gro, group="System"):
+    if middle_frame_ps is not None:
+       cmd = f"echo {group} | gmx trjconv -s {tpr_file} -f {equil_trr} -o {middle_frame_gro} -dump {middle_frame_ps}"
+       logging.info(f"Extracting frame trajectory {middle_frame_ps} ps to be used for production md")
+       run_command(cmd, cwd=clustering_anl)
+    else:
+        logging.error(f"Could not detect the middle frame for {rep_pdb}.")
+        sys.exit(1)
 
 def write_equilibration_report(
     total_time,
@@ -811,7 +893,7 @@ def write_equilibration_report(
     equil_start,
     equil_end,
     require_all_observables=True,
-    block_size=100,
+    block_size=10,
     overlap=0
 ):
     equil_info_path = os.path.join(clustering_anl, equil_info_file)
@@ -829,14 +911,6 @@ def write_equilibration_report(
             obs_basename = os.path.basename(obs)
             obs_threshold = thresholds_dict.get(obs, 0.02)
             f.write(f"  {obs_basename:40s} {time:8.1f} ps (threshold={obs_threshold})\n")
-
-        if not require_all_observables:
-            f.write("\nOTHER OBSERVABLES (analyzed but not used for equilibration):\n")
-            f.write("-"*60 + "\n")
-            for obs in xvg_files:
-                if obs not in equil_times:
-                    obs_basename = os.path.basename(obs)
-                    f.write(f"  {obs_basename:40s} [not used]\n")
 
         f.write("\n" + "-"*60 + "\n")
         f.write(f"FINAL EQUILIBRATION START: {equil_start:.1f} ps\n")
@@ -906,7 +980,6 @@ def check_equilibration_slope_drift(block_results,
     elif tolerance_type == "relative":
         last_half_start_index = len(averages) // 2
         final_std = np.std(averages[last_half_start_index:])
-        
         if final_std == 0:
             logging.warning("Std dev of final half is zero. Cannot use relative tolerance; defaulting to 1e-6 absolute.")
             drift_threshold = 1e-6
@@ -935,17 +1008,19 @@ def check_equilibration_slope_drift(block_results,
         # Make the decision
         if drift < drift_threshold:
             equilibration_time = t_window[0]
-            logging.info(f"Equilibration detected at t = {equilibration_time} ps (Slope/Drift method) with relative threshold of {tolerance_value}")
+            logging.debug(f"Equilibration detected at t = {equilibration_time} ps (Slope/Drift method) with relative threshold of {tolerance_value}")
             return equilibration_time
 
-    logging.warning("No stable equilibration point found using Slope/Drift method.")
+    #logging.warning(f"No equilibrated block found using window_size_blocks of {window_size_blocks}, and observable threshold of {tolerance_value}. Select different values for block size, window size, etc.")
+    
+    #sys.exit()
     return last_block_end 
 
 def check_equilibration_multi_observable(
     block_results_dict,
     thresholds_dict,
     method="slope_drift",  # Defaulting to the implemented method
-    window_size_blocks=5,
+    window_size_blocks=10,
     tolerance_type="relative",
     req_all_obs=False
 ):
@@ -991,24 +1066,26 @@ def check_equilibration_multi_observable(
 
 
 def get_convergence_clustering(
+    md_gro,
     output_dir,
     clustering_anl,
+    equil_trr,
+    rep_pdb,
     tpr_file,
     trr_file,
     obs_xvg_dict,
-    block_size=100,
+    block_size=10,
     overlap=0,
     thresholds=None,
     default_thresholds=None,
     method='slope_drift', # Changed default to the implemented method
-    window_size_blocks=5,
+    window_size_blocks=10,
     tolerance_type="relative",
-    cluster_cutoff=0.1,
+    cluster_cutoff=0.2,
     cluster_group="non-Water non-Water",
     req_all_obs=False
 ):
 
-    os.makedirs(clustering_anl, exist_ok=True)
     # Parse thresholds (assuming parse_observable_values is available)
     thresholds_dict = parse_observable_values(
         thresholds,
@@ -1073,18 +1150,20 @@ def get_convergence_clustering(
     	xvg_files=obs_xvg_dict.values(),
     	equil_start=equil_start,
     	equil_end=total_time,
-    	require_all_observables=req_all_obs,
+	require_all_observables=req_all_obs,
     	block_size=block_size,
     	overlap=overlap
     )
-
-    # Step 4 & 5: extract trajectory & cluster (assuming these functions are available)
-    equil_trr = os.path.join(clustering_anl, "equil_traj.trr")
-    extract_trajectory_segment(clustering_anl, tpr_file, trr_file, equil_trr, start_time=equil_start, end_time=None)
-    rep_pdb = os.path.join(clustering_anl, "rep_structure.pdb")
-    cluster_equilibrated_trajectory(clustering_anl, tpr_file, equil_trr, rep_pdb, cutoff=cluster_cutoff, group=cluster_group)
+    if equil_start == total_time:
+       logging.info(f"The equilibrated time was defaulted to {total_time} ps (simulation time) because no block was detected. Skipping the cluster trajectory step")
+       extract_trajectory_segment(clustering_anl, tpr_file, trr_file, equil_trr, start_time=total_time, end_time=None)
+       get_gro_middle_representative_model1(clustering_anl, total_time, tpr_file, equil_trr, md_gro, group="System")
+    else:
+        extract_trajectory_segment(clustering_anl, tpr_file, trr_file, equil_trr, start_time=equil_start, end_time=None)
+        cluster_equilibrated_trajectory(clustering_anl, tpr_file, equil_trr, rep_pdb, cutoff=cluster_cutoff, group=cluster_group)
+        middle_frame_ps = extract_middle_representative_model1(rep_pdb, clustering_anl)
+        get_gro_middle_representative_model1(clustering_anl, middle_frame_ps, tpr_file, equil_trr, md_gro, group="System")    
     
-
 # Workflow execution
 def main():
     parser = argparse.ArgumentParser(
@@ -1205,14 +1284,14 @@ def main():
     convergence_group.add_argument(
         "-bs", "--block_size",
         type=int,
-        default=100,
-        help="The amount of time (in ps) for each block (default: 100)"
+        default=10,
+        help="The amount of time (in ps) for each block (default: 10)"
     )
     convergence_group.add_argument(
         "-wsb", "--window_size_blocks",
         type=int,
-        default=5,
-        help="Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 5)"
+        default=10,
+        help="Number of consecutive blocks to analyze together for slope calculation in equilibration detection (default: 10)"
     )
     convergence_group.add_argument(
         "-ov", "--overlap",
@@ -1316,6 +1395,7 @@ def main():
     equilibration_tpr = os.path.join(nvt_output, "equilibration.tpr")
     equilibration_edr = os.path.join(nvt_output, "equilibration.edr")
     equilibration_trr = os.path.join(nvt_output, "equilibration.trr")
+    equilibration_gro = os.path.join(nvt_output, "equilibration.gro")
     eq_potential_xvg = os.path.join(nvt_output, "eq_potential.xvg")
     eq_pressure_xvg = os.path.join(nvt_output, "eq_pressure.xvg")
     eq_temperature_xvg = os.path.join(nvt_output, "eq_temperature.xvg")
@@ -1330,9 +1410,11 @@ def main():
     # NPT Equilibration workflow
     npt_output = os.path.join(output_dir, "npt_output")
     os.makedirs(npt_output, exist_ok=True)
+    npt_cpt = os.path.join(npt_output, "npt_equilibration.cpt")
     npt_tpr = os.path.join(npt_output, "npt_equilibration.tpr")
     npt_edr = os.path.join(npt_output, "npt_equilibration.edr")
     npt_trr = os.path.join(npt_output, "npt_equilibration.trr")
+    npt_gro = os.path.join(npt_output, "npt_equilibration.gro")
     npt_potential_xvg = os.path.join(npt_output, "npt_potential.xvg")
     npt_pressure_xvg = os.path.join(npt_output, "npt_pressure.xvg")
     npt_temperature_xvg = os.path.join(npt_output, "npt_temperature.xvg")
@@ -1340,9 +1422,22 @@ def main():
     npt_rmsf_xvg = os.path.join(npt_output, "npt_rmsf.xvg")
     npt_gyrate_xvg = os.path.join(npt_output, "npt_gyrate.xvg")
     final_npt_pdb = os.path.join(npt_output, "npt.pdb")
-    final_npt_gro = os.path.join(npt_output, "npt.gro")
     final_last_npt_pdb = os.path.join(npt_output, "npt_last_frame.pdb")
     npt_analysis_pdf = os.path.join(npt_output, "npt_metrics_plot.pdf")
+
+
+    # Convergence workflow
+    OBSERVABLE_XVG = {
+        "potential": npt_potential_xvg,
+        "pressure": npt_pressure_xvg,
+        "rmsd": npt_rmsd_xvg,
+        "rgyr": npt_gyrate_xvg
+    }
+    clustering_anl = os.path.join(output_dir, "clustering_anls")
+    os.makedirs(clustering_anl, exist_ok=True)
+    equil_trr = os.path.join(clustering_anl, "equil_traj.trr")
+    rep_pdb = os.path.join(clustering_anl, "rep_structures.pdb")
+    md_gro = os.path.join(clustering_anl, "md_gro.gro")
 
     # Production workflow
     production_output = os.path.join(output_dir, "production_output")
@@ -1357,20 +1452,11 @@ def main():
     production_rmsf_xvg = os.path.join(production_output, "production_rmsf.xvg")
     production_gyrate_xvg = os.path.join(production_output, "production_gyrate.xvg")
     final_production_pdb = os.path.join(production_output, "production.pdb")
-    final_production_gro = os.path.join(production_output, "production.gro")
     final_last_production_pdb = os.path.join(production_output, "production_last_frame.pdb")
     production_analysis_pdf = os.path.join(production_output, "production_metrics_plot.pdf")
 
-    # OBSERVABLE → XVG mapping
-    OBSERVABLE_XVG = {
-        "potential": production_potential_xvg,
-        "pressure": production_pressure_xvg,
-        "rmsd": production_rmsd_xvg,
-        "rgyr": production_gyrate_xvg
-    }
-
-    # Clustering analyses
-    clustering_anl = os.path.join(output_dir, "clustering_anls")
+    #inspect input files
+    inspect_input_files(protein_file, ligand_files)
 
     equilibrator_steps = []
     # === Protein Capping ===
@@ -1415,23 +1501,23 @@ def main():
     # === NVT Equilibration ===
     equilibrator_steps.append(("Running NVT equilibration", lambda: run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir
     )))
-    equilibrator_steps.append(("Getting NVT equilibration output", lambda: get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis, final_equilibrated_gro
+    equilibrator_steps.append(("Getting NVT equilibration output", lambda: get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg, equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg, final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis
     )))
 
     #===NPT Equilibration ===
-    equilibrator_steps.append(("Running NPT equilibration", lambda: run_NPT_equilibration(topology_file, npt_tpr, final_equilibrated_gro, final_last_npt_pdb, output_dir
+    equilibrator_steps.append(("Running NPT equilibration", lambda: run_NPT_equilibration(topology_file, npt_tpr, equilibration_gro, final_last_npt_pdb, output_dir
     )))
-    equilibrator_steps.append(("Getting NPT equilibration output", lambda: get_equilibration_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf, final_npt_gro
+    equilibrator_steps.append(("Getting NPT equilibration output", lambda: get_equilibration_output(npt_edr, npt_potential_xvg, npt_pressure_xvg, npt_temperature_xvg, npt_tpr, npt_trr, npt_rmsd_xvg, npt_rmsf_xvg, npt_gyrate_xvg, final_last_npt_pdb, final_npt_pdb, npt_analysis_pdf
+    )))
+    equilibrator_steps.append(("Getting convergence and clustering", lambda: get_convergence_clustering(md_gro, output_dir, clustering_anl, equil_trr, rep_pdb, npt_tpr, npt_trr, obs_xvg_dict=OBSERVABLE_XVG, block_size=args.block_size, overlap=args.overlap, thresholds=args.obs_thresholds, default_thresholds=DEFAULT_OBS_THRESHOLDS, method="slope_drift", window_size_blocks=args.window_size_blocks, cluster_cutoff=args.rmsd_cutoff, cluster_group="non-Water non-Water", req_all_obs=args.req_all_obs,
     )))
 
     #===Production stage ==
-    equilibrator_steps.append(("Running Production stage", lambda: run_production_stage(topology_file, production_tpr, final_npt_gro, output_dir
-    )))    
-    equilibrator_steps.append(("Getting Production output", lambda: get_equilibration_output(production_edr, production_potential_xvg, production_pressure_xvg, production_temperature_xvg, production_tpr, production_trr, production_rmsd_xvg, production_rmsf_xvg, production_gyrate_xvg, final_last_production_pdb, final_production_pdb, production_analysis_pdf, final_production_gro
+    equilibrator_steps.append(("Running Production stage", lambda: run_production_stage(npt_cpt, topology_file, production_tpr, md_gro, output_dir
     )))
-    equilibrator_steps.append(("Getting convergence and clustering", lambda: get_convergence_clustering(output_dir, clustering_anl, production_tpr, production_trr, obs_xvg_dict=OBSERVABLE_XVG, block_size=args.block_size, overlap=args.overlap, thresholds=args.obs_thresholds, default_thresholds=DEFAULT_OBS_THRESHOLDS, method="slope_drift", window_size_blocks=args.window_size_blocks, cluster_cutoff=args.rmsd_cutoff, cluster_group="non-Water non-Water", req_all_obs=args.req_all_obs,  
+    equilibrator_steps.append(("Getting Production output", lambda: get_equilibration_output(production_edr, production_potential_xvg, production_pressure_xvg, production_temperature_xvg, production_tpr, production_trr, production_rmsd_xvg, production_rmsf_xvg, production_gyrate_xvg, final_last_production_pdb, final_production_pdb, production_analysis_pdf
     )))
-
+    
     if args.last_step is None:
         args.last_step = len(equilibrator_steps)
     if args.all_steps:
