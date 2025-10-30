@@ -213,7 +213,7 @@ def generate_topology_protein(protein_file, topology_file, protein_gro, output_d
             f"Failed to generate topology for {protein_file}: {e}"
         )
 
-def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, molecule_names, output_dir, ligands_provided):
+def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, molecule_names, output_dir, ligands_provided, force_field="amber99sb"):
     """
     Edits topology files to prepare for merging if ligand files provided.
 
@@ -226,7 +226,6 @@ def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list,
     """
     with open(topology_file, "r") as top_file:
         topology_lines = top_file.readlines()
-    
     #; Include chain topologies
     if ligands_provided:
         include_lines = [
@@ -237,7 +236,7 @@ def prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list,
             include_lines.append(f'#include "{os.path.join(output_dir, ligand_top)}"\n')
         chain_includes_idx = next(
             (i for i, line in enumerate(topology_lines) 
-             if line.strip() == '#include "amber99sb.ff/forcefield.itp"'),
+             if line.strip() == f'#include "{force_field}.ff/forcefield.itp"'),
             -1
         )
         if chain_includes_idx == -1:
@@ -1476,7 +1475,7 @@ def main():
     
 
     # === Merge Prep ===
-    equilibrator_steps.append(("Checking wether merging topology file(s) is necessary", lambda: prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, ligand_names, output_dir, bool(ligand_files))))
+    equilibrator_steps.append(("Checking wether merging topology file(s) is necessary", lambda: prepare_to_merge_topologies(topology_file, ligand_itp_list, ligand_top_list, ligand_names, output_dir, bool(ligand_files), force_field=args.force_field)))
     
     if ligand_files:
         equilibrator_steps.append((f"Making a copy of the protein: {protein_file}", lambda: make_copy_of_protein(protein_gro, protein_gro_complex)))
