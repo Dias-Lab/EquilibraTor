@@ -65,9 +65,9 @@ usage: EquilibraTor [-h] [-l LIGANDS [LIGANDS ...]] -p PROTEIN [-aa {gaff,amber,
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
 
@@ -140,18 +140,18 @@ To show the EquilibraTor steps to be performed for a protein file:
 
 ```Text
 EquilibraTor -p example/example_protein.pdb -as
-
-   ____          _ ___ __           ______        
+   ____          _ ___ __           ______
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
+
 Available steps:
 1: Generating topology for the protein: example_protein
 2: Checking wether merging topology file(s) is necessary
@@ -178,17 +178,18 @@ To show the EquilibraTor steps to be performed for a protein file, when the prot
 ```
 EquilibraTor -p example/example_protein.pdb -cp -as
 
-   ____          _ ___ __           ______        
+   ____          _ ___ __           ______
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
+
 Available steps:
 1: Adding ACE and NME terminal capping groups to the protein: example_protein
 2: Generating topology for the protein: example_protein_capped.pdb
@@ -228,17 +229,18 @@ To show the EquilibraTor steps to be performed when provided both protein and li
 ```Text
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -as
 
-   ____          _ ___ __           ______        
+   ____          _ ___ __           ______
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
+
 Available steps:
 1: Generating topology for the protein: example_protein
 2: Converting example_ligand PDB to MOL2
@@ -269,17 +271,18 @@ To show the EquilibraTor steps to be performed when provided both protein and li
 ```
 EquilibraTor -l example/example_ligand.pdb -p example/example_protein.pdb -cp -as
 
-   ____          _ ___ __           ______        
+   ____          _ ___ __           ______
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
+
 Available steps:
 1: Adding ACE and NME terminal capping groups to the protein: example_protein
 2: Generating topology for the protein: example_protein_capped.pdb
@@ -367,17 +370,18 @@ After running EquilibraTor with the protein and ligand examples, the execution s
 
 
 ```
-   ____          _ ___ __           ______        
+   ____          _ ___ __           ______
   / __/__ ___ __(_) (_) /  _______ /_  __/__  ____
  / _// _ `/ // / / / / _ \/ __/ _ `// / / _ \/ __/
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:v1.0.0
+
 
 [1] - 2025-10-29 12:16:08,786 - INFO - Generating topology for the protein: example_protein
 [2] - 2025-10-29 12:16:10,386 - INFO - Converting example_ligand PDB to MOL2

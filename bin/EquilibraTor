@@ -36,9 +36,9 @@ DESCRIPTION = """
 /___/\_, /\_,_/_/_/_/_.__/_/  \_,_//_/  \___/_/
       /_/
 Equilibrator streamlines Molecular dynamics and equilibration simulations for proteins and protein-ligand complexes in a single execution
-Developer: José D. D. Cediel-Becerra
-Co-developers: Jose Cleydson F. Silva and Raquel Dias
-Afiliation: Microbiology & Cell Science Deparment, University of Florida
+Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
+Co-developer: Raquel Dias
+Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
 Version:"""+VERSION
 
