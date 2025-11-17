@@ -2,6 +2,8 @@
 
 EquilibraTor is a Python-based command-line tool that automates the setup and execution of molecular dynamics (MD) simulations for protein (and optionally ligand) systems using GROMACS. The pipeline runs from topology generation to energy minimization and equilibration, with customizable execution steps.
 
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
+
 ## 🛠️  Installation
 
 ---
@@ -69,6 +71,7 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:v1.0.0
 
 options:
@@ -150,6 +153,7 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:v1.0.0
 
 Available steps:
@@ -188,6 +192,7 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:v1.0.0
 
 Available steps:
@@ -239,6 +244,7 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:v1.0.0
 
 Available steps:
@@ -281,6 +287,7 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:v1.0.0
 
 Available steps:
@@ -380,8 +387,8 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:v1.0.0
-
 
 [1] - 2025-10-29 12:16:08,786 - INFO - Generating topology for the protein: example_protein
 [2] - 2025-10-29 12:16:10,386 - INFO - Converting example_ligand PDB to MOL2

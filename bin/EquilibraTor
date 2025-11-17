@@ -40,6 +40,7 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
+Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:"""+VERSION
 
 def equilibrator_elapsed_time(
