@@ -12,12 +12,22 @@ import equilibrator.flat
 import matplotlib.pyplot as plt
 from utils.termini_capping import cap_protein
 
+## Helper to resolve local overrides before falling back to package defaults
+PACKAGE_DIR = os.path.dirname(equilibrator.flat.__file__)
+
+def resolve_mdp(filename: str) -> str:
+    local_path = os.path.join(os.getcwd(), filename)
+    if os.path.isfile(local_path):
+        return local_path
+    return os.path.join(PACKAGE_DIR, filename)
+
 ## Constants
-IONS_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'ions.mdp')
-MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minimization_stage.mdp')
-NVT_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'nvt_stage.mdp')
-NPT_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'npt_stage.mdp')
-PRODUCTION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'production_stage.mdp')
+IONS_MDP = resolve_mdp('ions.mdp')
+MINIM_MDP = resolve_mdp('minimization_stage.mdp')
+NVT_MDP = resolve_mdp('nvt_stage.mdp')
+NPT_MDP = resolve_mdp('npt_stage.mdp')
+PRODUCTION_MDP = resolve_mdp('production_stage.mdp')
+
 
 # Dict of default relative thresholds for each observable
 DEFAULT_OBS_THRESHOLDS = {
