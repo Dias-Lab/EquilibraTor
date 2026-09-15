@@ -1,4 +1,4 @@
-#! bin/env/ python
+#!/blue/raquel.dias/share/conda/envs/EquilibraTor/bin/python3.11
 
 import os
 import re
@@ -11,6 +11,15 @@ import numpy as np
 import equilibrator.flat
 import matplotlib.pyplot as plt
 from utils.termini_capping import cap_protein
+
+## Constants
+'''
+IONS_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'ions.mdp')
+MINIM_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'minimization_stage.mdp')
+NVT_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'nvt_stage.mdp')
+NPT_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'npt_stage.mdp')
+PRODUCTION_MDP = os.path.join(os.path.dirname(equilibrator.flat.__file__),'production_stage.mdp')
+'''
 
 ## Helper to resolve local overrides before falling back to package defaults
 PACKAGE_DIR = os.path.dirname(equilibrator.flat.__file__)
@@ -50,7 +59,6 @@ Developers: José D. D. Cediel-Becerra and Jose Cleydson F. Silva
 Co-developer: Raquel Dias
 Afiliation: Microbiology & Cell Science Department, University of Florida
 If you find any issues, please add a new issue in our GitHub repo (https://github.com/Dias-Lab/EquilibraTor)
-Find our paper here: https://doi.org/10.1016/j.csbj.2025.11.034
 Version:"""+VERSION
 
 def equilibrator_elapsed_time(
@@ -556,6 +564,18 @@ def get_final_minimized_structure(em_tpr, em_trr, final_minimized):
     except Exception as e:
         logging.error(f"Failed to extract final minimized structure to {final_minimized}: {e}")
 
+def make_trajectory_whole(tpr_file, trr_file, output_dir, whole_trr, group="System"):
+    """Reassemble molecules split across periodic boundaries before any RMSD/Rg/RMSF
+    calculation or visualization. Without this, ions/ligands/chains that diffuse
+    across the box edge produce spurious spikes in downstream analysis."""
+    command = f"echo '{group}' | gmx trjconv -s {tpr_file} -f {trr_file} -o {whole_trr} -pbc mol -center"
+    try:
+        run_command(command, cwd=output_dir)
+    except Exception as e:
+        logging.error(f"Failed to generate whole/centered trajectory from {trr_file}: {e}")
+        raise
+
+
 def load_xvg(filename):
     """Load numerical data from an XVG file, ignoring comment lines starting with @ or #."""
     try:
@@ -681,16 +701,24 @@ def run_NVT_equilibration(topology_file, equilibration_tpr, em_gro, output_dir):
         logging.error(f"Failed to run mdrun for NVT equilibration: {e}")
         raise
 
+
+
 def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xvg, eq_temperature_xvg,
                              equilibration_tpr, equilibration_trr, eq_rmsd_xvg, eq_rmsf_xvg, eq_gyrate_xvg,
                              final_last_equilibrated_pdb, final_equilibrated_pdb, equilibration_analysis):
+
+    # Fix PBC artifacts before any spatial analysis (this now runs for NVT, NPT,
+    # and production, since they all call this same function)
+    whole_trr = equilibration_trr.replace(".trr", "_whole.trr")
+    make_trajectory_whole(equilibration_tpr, equilibration_trr, os.path.dirname(equilibration_trr), whole_trr)
+
     commands = [
         (f"echo 'Potential' | gmx energy -f {equilibration_edr} -o {eq_potential_xvg}", "Extract potential energy"),
         (f"echo 'Pressure' | gmx energy -f {equilibration_edr} -o {eq_pressure_xvg}", "Extract pressure"),
         (f"echo 'Temperature' | gmx energy -f {equilibration_edr} -o {eq_temperature_xvg}", "Extract temperature"),
-        (f"echo 'Backbone Backbone' | gmx rms -s {equilibration_tpr} -f {equilibration_trr} -o {eq_rmsd_xvg}", "Calculate RMSD"),
-        (f"echo 'Backbone' | gmx rmsf -s {equilibration_tpr} -f {equilibration_trr} -o {eq_rmsf_xvg}", "Calculate RMSF"),
-        (f"echo 'Protein' | gmx gyrate -s {equilibration_tpr} -f {equilibration_trr} -o {eq_gyrate_xvg}", "Calculate radius of gyration")
+        (f"echo 'Backbone Backbone' | gmx rms -s {equilibration_tpr} -f {whole_trr} -o {eq_rmsd_xvg}", "Calculate RMSD"),
+        (f"echo 'Backbone' | gmx rmsf -s {equilibration_tpr} -f {whole_trr} -o {eq_rmsf_xvg}", "Calculate RMSF"),
+        (f"echo 'Protein' | gmx gyrate -s {equilibration_tpr} -f {whole_trr} -o {eq_gyrate_xvg}", "Calculate radius of gyration")
     ]
 
     for cmd, description in commands:
@@ -701,7 +729,7 @@ def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xv
             raise
 
     try:
-        extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
+        extract_last_frame_and_unwrap(equilibration_tpr, whole_trr,
                                      final_last_equilibrated_pdb, final_equilibrated_pdb)
     except Exception as e:
         logging.error(f"Failed in extract_last_frame_and_unwrap: {e}")
@@ -712,6 +740,7 @@ def get_equilibration_output(equilibration_edr, eq_potential_xvg, eq_pressure_xv
     except Exception as e:
         logging.error(f"Failed to plot equilibration analysis: {e}")
         raise
+
 
 def run_NPT_equilibration(topology_file, npt_tpr, nvt_gro, final_last_npt_pdb, output_dir):
     """Run NPT equilibration with robust error handling."""
@@ -1075,6 +1104,7 @@ def check_equilibration_multi_observable(
     return equil_start, equil_times
 
 
+
 def get_convergence_clustering(
     md_gro,
     output_dir,
@@ -1088,13 +1118,17 @@ def get_convergence_clustering(
     overlap=0,
     thresholds=None,
     default_thresholds=None,
-    method='slope_drift', # Changed default to the implemented method
+    method='slope_drift',
     window_size_blocks=10,
     tolerance_type="relative",
     cluster_cutoff=0.2,
     cluster_group="non-Water non-Water",
     req_all_obs=False
 ):
+
+    # Fix PBC artifacts before extracting/clustering the equilibrated segment
+    whole_trr = trr_file.replace(".trr", "_whole.trr")
+    make_trajectory_whole(tpr_file, trr_file, clustering_anl, whole_trr)
 
     # Parse thresholds (assuming parse_observable_values is available)
     thresholds_dict = parse_observable_values(
@@ -1104,6 +1138,7 @@ def get_convergence_clustering(
         req_all_obs=req_all_obs
     )
     logging.info(f"Observables thresholds requested: {thresholds_dict}")
+
     # Decide which observables to analyze
     if req_all_obs:
         obs_to_analyze = list(obs_xvg_dict.keys())
@@ -1164,16 +1199,20 @@ def get_convergence_clustering(
     	block_size=block_size,
     	overlap=overlap
     )
+
     if equil_start == total_time:
        logging.info(f"The equilibrated time was defaulted to {total_time} ps (simulation time) because no block was detected. Skipping the cluster trajectory step")
-       extract_trajectory_segment(clustering_anl, tpr_file, trr_file, equil_trr, start_time=total_time, end_time=None)
+       extract_trajectory_segment(clustering_anl, tpr_file, whole_trr, equil_trr, start_time=total_time, end_time=None)
        get_gro_middle_representative_model1(clustering_anl, total_time, tpr_file, equil_trr, md_gro, group="System")
     else:
-        extract_trajectory_segment(clustering_anl, tpr_file, trr_file, equil_trr, start_time=equil_start, end_time=None)
+        extract_trajectory_segment(clustering_anl, tpr_file, whole_trr, equil_trr, start_time=equil_start, end_time=None)
         cluster_equilibrated_trajectory(clustering_anl, tpr_file, equil_trr, rep_pdb, cutoff=cluster_cutoff, group=cluster_group)
         middle_frame_ps = extract_middle_representative_model1(rep_pdb, clustering_anl)
-        get_gro_middle_representative_model1(clustering_anl, middle_frame_ps, tpr_file, equil_trr, md_gro, group="System")    
-    
+        get_gro_middle_representative_model1(clustering_anl, middle_frame_ps, tpr_file, equil_trr, md_gro, group="System")
+
+
+
+
 # Workflow execution
 def main():
     parser = argparse.ArgumentParser(
@@ -1225,7 +1264,7 @@ def main():
 	"-gff", "--force_field",
 	required=False,
 	type=str,
-	choices=["amber94", "amber96", "amber99", "amber99sb", "amber99sb-ildn", "amber03"],
+	choices=["amber94", "amber96", "amber99", "amber99sb", "amber99sbPTR", "amber99sb-ildn", "amber03", "gromos43a1p"],
 	default="amber99sb",
 	help="Specify the Force Fields supported by GROMACS"
     )
