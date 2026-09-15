@@ -564,16 +564,23 @@ def get_final_minimized_structure(em_tpr, em_trr, final_minimized):
     except Exception as e:
         logging.error(f"Failed to extract final minimized structure to {final_minimized}: {e}")
 
-def make_trajectory_whole(tpr_file, trr_file, output_dir, whole_trr, group="System"):
+def make_trajectory_whole(tpr_file, trr_file, output_dir, whole_trr,
+                           center_group="non-Water", output_group="System"):
     """Reassemble molecules split across periodic boundaries before any RMSD/Rg/RMSF
-    calculation or visualization. Without this, ions/ligands/chains that diffuse
-    across the box edge produce spurious spikes in downstream analysis."""
-    command = f"echo '{group}' | gmx trjconv -s {tpr_file} -f {trr_file} -o {whole_trr} -pbc mol -center"
+    calculation or visualization. -pbc mol -center needs two selections: the group
+    to center on, then the group to write out. Centering on the solute (non-Water,
+    i.e. protein/DNA/ions/ligands) and outputting System keeps water in the result
+    while giving a meaningful center, unlike centering on System itself."""
+    command = (
+        f"printf '{center_group}\\n{output_group}\\n' | "
+        f"gmx trjconv -s {tpr_file} -f {trr_file} -o {whole_trr} -pbc mol -center"
+    )
     try:
         run_command(command, cwd=output_dir)
     except Exception as e:
         logging.error(f"Failed to generate whole/centered trajectory from {trr_file}: {e}")
         raise
+
 
 
 def load_xvg(filename):
