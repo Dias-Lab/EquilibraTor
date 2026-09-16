@@ -566,22 +566,19 @@ def get_final_minimized_structure(em_tpr, em_trr, final_minimized):
 
 def make_trajectory_whole(tpr_file, trr_file, output_dir, whole_trr,
                            center_group="non-Water", output_group="System"):
-    """Reassemble molecules split across periodic boundaries before any RMSD/Rg/RMSF
-    calculation or visualization. -pbc mol -center needs two selections: the group
-    to center on, then the group to write out. Centering on the solute (non-Water,
-    i.e. protein/DNA/ions/ligands) and outputting System keeps water in the result
-    while giving a meaningful center, unlike centering on System itself."""
+    """Unwrap PBC jumps first (nojump), THEN center. Do NOT rewrap with
+    -pbc mol afterward for anything you plan to visualize or run nojump
+    on downstream — mol wraps per-frame independently and can introduce
+    the exact discontinuities nojump is supposed to remove."""
     command = (
         f"printf '{center_group}\\n{output_group}\\n' | "
-        f"gmx trjconv -s {tpr_file} -f {trr_file} -o {whole_trr} -pbc mol -center"
+        f"gmx trjconv -s {tpr_file} -f {trr_file} -o {whole_trr} -pbc nojump -center"
     )
     try:
         run_command(command, cwd=output_dir)
     except Exception as e:
         logging.error(f"Failed to generate whole/centered trajectory from {trr_file}: {e}")
         raise
-
-
 
 def load_xvg(filename):
     """Load numerical data from an XVG file, ignoring comment lines starting with @ or #."""
@@ -675,7 +672,7 @@ def extract_last_frame_and_unwrap(equilibration_tpr, equilibration_trr,
 
     get_movie_pdb = (
         f"echo '{group1}' | gmx trjconv -s {equilibration_tpr} -f {equilibration_trr} "
-        f"-o {final_equilibrated_pdb} -pbc nojump"
+        f"-o {final_equilibrated_pdb}"
     )
 
     try:
